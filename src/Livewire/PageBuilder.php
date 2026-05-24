@@ -57,6 +57,16 @@ class PageBuilder extends Component
     public bool $emailMode = false;
 
     /**
+     * Per-page metadata · today the email use case writes subject /
+     * preheader / reply-to here, but the JSON column is open-ended so
+     * SEO meta, scheduled-publish flags, locale codes etc can pile on
+     * later without another migration.
+     *
+     * @var array<string, mixed>
+     */
+    public array $meta = ['subject' => '', 'preheader' => '', 'replyTo' => ''];
+
+    /**
      * Authored block tree · the root list. Layout blocks carry `children`
      * keyed by slot name; each slot is a list of nested blocks. Persisted
      * verbatim as JSON on the `pages.blocks` column.
@@ -164,6 +174,10 @@ class PageBuilder extends Component
             default           => null,
         };
         $this->blocks = $page ? BlockTree::sanitise((array) $page->blocks) : [];
+        $this->meta   = array_merge(
+            ['subject' => '', 'preheader' => '', 'replyTo' => ''],
+            $page ? (array) ($page->meta ?? []) : [],
+        );
         $this->lastSavedAt = $page?->updated_at?->toIso8601String();
 
         $graph = $routeId !== null ? NodeGraph::where('route_id', $routeId)->first() : null;
@@ -843,18 +857,20 @@ class PageBuilder extends Component
                 pageId:  null,
                 savedAt: $this->lastSavedAt,
                 blocks:  $this->blocks,
+                meta:    $this->meta,
             );
             return;
         }
 
+        $payload = [
+            'blocks' => BlockTree::sanitise($this->blocks),
+            'meta'   => $this->meta,
+        ];
         $page = $this->pageId !== null
-            ? tap(Page::find($this->pageId), function ($p) {
-                if ($p) $p->update(['blocks' => BlockTree::sanitise($this->blocks)]);
+            ? tap(Page::find($this->pageId), function ($p) use ($payload) {
+                if ($p) $p->update($payload);
             })
-            : Page::updateOrCreate(
-                ['route_id' => $this->routeId],
-                ['blocks' => BlockTree::sanitise($this->blocks)],
-            );
+            : Page::updateOrCreate(['route_id' => $this->routeId], $payload);
 
         $this->lastSavedAt = $page?->updated_at?->toIso8601String();
         $this->snapshotRevision();
@@ -862,6 +878,7 @@ class PageBuilder extends Component
             routeId: $this->routeId,
             pageId:  $this->pageId,
             savedAt: $this->lastSavedAt,
+            meta:    $this->meta,
         );
         if ($page) PageSaved::dispatch($page, auth()->user());
     }

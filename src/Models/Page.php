@@ -11,6 +11,7 @@ class Page extends Model
 
     protected $casts = [
         'blocks' => 'array',
+        'meta'   => 'array',
     ];
 
     public function getTable(): string
