@@ -360,6 +360,110 @@ class PageBuilder extends Component
         $this->selectedPath = $this->pathFor($parentPath, $slot, $index + 1);
     }
 
+    // ─── Snippet library ────────────────────────────────────────────────
+
+    /**
+     * Save the block at $path as a named snippet · deep-clones the subtree
+     * with fresh ids so future drops never collide with the source block.
+     * Silently returns when the path does not resolve, when the name is
+     * empty, or when a snippet by that name already exists (a rename via
+     * the manager is required to overwrite).
+     */
+    public function saveAsSnippet(string $path, string $name, string $label = ''): void
+    {
+        $name = trim($name);
+        if ($name === '') return;
+
+        $source = BlockTree::get($this->blocks, $path);
+        if (! $source) return;
+
+        // Best-effort icon · use the BlockType's icon if the registry
+        // declares one, falling back to the default star.
+        $schema = config('page-studio.blocks.'.($source['type'] ?? ''), []);
+        $icon   = (string) ($schema['icon'] ?? '★');
+        // Trim to the 8-char column width · multi-byte safe.
+        if (mb_strlen($icon) > 8) $icon = mb_substr($icon, 0, 8);
+
+        $clone = $this->cloneBlockWithFreshIds($source);
+
+        $snippet = \LoggedCloud\PageStudio\Models\Snippet::create([
+            'name'      => $name,
+            'label'     => $label !== '' ? $label : $name,
+            'icon'      => $icon !== '' ? $icon : '★',
+            'group'     => 'snippets',
+            'block'     => $clone,
+            'author_id' => auth()->id(),
+        ]);
+
+        $this->dispatch('page-studio:snippet:saved', snippetId: $snippet->id);
+    }
+
+    /**
+     * Drop a fresh copy of the saved snippet into the (parentPath, slot, index)
+     * target · mirrors addBlock's call shape. Silently returns when the named
+     * snippet doesn't exist so a stale palette button can't crash the editor.
+     */
+    public function dropSnippet(string $snippetName, string $parentPath = '', ?string $slot = null, ?int $index = null): void
+    {
+        $row = \LoggedCloud\PageStudio\Models\Snippet::where('name', $snippetName)->first();
+        if (! $row) return;
+
+        $tree = (array) $row->block;
+        if (empty($tree) || ! isset($tree['type'])) return;
+
+        $this->pushHistory();
+        // Re-id at drop time so two drops of the same snippet land as
+        // distinct subtrees · wire:key collisions otherwise wreck the
+        // editor's morphdom diff.
+        $clone  = $this->cloneBlockWithFreshIds($tree);
+        $target = $index ?? count($this->slotContents($parentPath, $slot));
+        $this->blocks = BlockTree::insert($this->blocks, $parentPath, $slot, $target, $clone);
+        $this->selectedPath = $this->pathFor($parentPath, $slot, $target);
+    }
+
+    /**
+     * Lightweight snippet directory · drops the block tree from the
+     * snapshot so the Livewire payload stays tiny. The full subtree only
+     * comes back across the wire on drop, when dropSnippet loads the row.
+     *
+     * @return array<int, array{id:int,name:string,label:string,icon:string,group:string}>
+     */
+    #[Computed]
+    public function snippetLibrary(): array
+    {
+        return \LoggedCloud\PageStudio\Models\Snippet::orderBy('group')
+            ->orderBy('label')
+            ->get(['id', 'name', 'label', 'icon', 'group'])
+            ->map(fn ($s) => [
+                'id'    => (int) $s->id,
+                'name'  => (string) $s->name,
+                'label' => (string) ($s->label ?: $s->name),
+                'icon'  => (string) ($s->icon ?: '★'),
+                'group' => (string) ($s->group ?: 'snippets'),
+            ])
+            ->all();
+    }
+
+    public function renameSnippet(int $id, string $newName, string $newLabel = ''): void
+    {
+        $newName = trim($newName);
+        if ($newName === '') return;
+        $row = \LoggedCloud\PageStudio\Models\Snippet::find($id);
+        if (! $row) return;
+        $row->name  = $newName;
+        $row->label = $newLabel !== '' ? $newLabel : $newName;
+        $row->save();
+    }
+
+    public function deleteSnippet(int $id): void
+    {
+        $row = \LoggedCloud\PageStudio\Models\Snippet::find($id);
+        if (! $row) return;
+        $row->delete();
+    }
+
+    // ─── Search-and-replace ─────────────────────────────────────────────
+
     /**
      * Walk every block in the tree and apply $find -> $replace across each
      * string-valued setting. Returns the count of blocks where at least one
