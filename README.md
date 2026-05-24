@@ -9,7 +9,7 @@ A Laravel package that turns "let users build pages and routes from a form" into
 Designed to drop into any Livewire 3+ Laravel app.
 
 > **Extending the studio?** Step-by-step tutorials live under `docs/tutorials/`:
-> [Build a custom block](docs/tutorials/custom-blocks.md) · [Build a custom node](docs/tutorials/custom-nodes.md) · [Theming + light mode](docs/tutorials/theming.md)
+> [Custom block](docs/tutorials/custom-blocks.md) · [Custom node](docs/tutorials/custom-nodes.md) · [Custom template](docs/tutorials/custom-templates.md) · [Theming + light mode](docs/tutorials/theming.md) · [Migrate HTML content](docs/tutorials/migrate-html.md)
 
 ---
 
@@ -27,7 +27,9 @@ Designed to drop into any Livewire 3+ Laravel app.
 - **Tutorials**
   - [Custom blocks · developer-defined](docs/tutorials/custom-blocks.md)
   - [Custom nodes · developer-defined](docs/tutorials/custom-nodes.md)
+  - [Custom templates · seed routes + pages + graphs in one shot](docs/tutorials/custom-templates.md)
   - [Theming · light mode + your own palette](docs/tutorials/theming.md)
+  - [Migrate HTML content into the block tree](docs/tutorials/migrate-html.md)
 - [Starter templates](#starter-templates)
 - [Importing existing HTML](#importing-existing-html)
 - [Custom blocks (in this README)](#custom-blocks--developer-defined)
@@ -450,6 +452,8 @@ Bottom drawer on the page builder. Left palette / centre canvas / right node set
 
 ### Starter templates
 
+> **Step-by-step walkthrough:** [docs/tutorials/custom-templates.md](docs/tutorials/custom-templates.md) · build a Newsletter template end-to-end, with a node graph that derives chips from route variables.
+
 Bootstrap a route + variables + page + node graph in one shot:
 
 ```bash
@@ -507,6 +511,8 @@ class ProductTemplate extends Template
 ---
 
 ### Importing existing HTML
+
+> **Step-by-step walkthrough:** [docs/tutorials/migrate-html.md](docs/tutorials/migrate-html.md) · realistic backfill recipe (chunkById, idempotent re-runs, merge-tag re-writing, phased rollout, table preservation).
 
 Migrating off a wysiwyg editor (CKEditor, TinyMCE, Trix)? Use `HtmlImporter::toBlocks($html)` to convert a stored HTML blob into a page-studio block tree:
 
