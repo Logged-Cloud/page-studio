@@ -1,0 +1,50 @@
+{
+    "name": "logged-cloud/page-studio",
+    "description": "Visual route + page builder for Laravel. Right-click route segments to turn them into variables; reuse those variables across routes and pages with rules + examples.",
+    "keywords": ["laravel", "livewire", "alpine", "page-builder", "route-builder", "cms"],
+    "license": "FSL-1.1-MIT",
+    "authors": [
+        {"name": "Charles Lennon"}
+    ],
+    "homepage": "https://github.com/Logged-Cloud/page-studio",
+    "require": {
+        "php": "^8.2",
+        "illuminate/support": "^11.0 || ^12.0 || ^13.0",
+        "illuminate/database": "^11.0 || ^12.0 || ^13.0"
+    },
+    "require-dev": {
+        "pestphp/pest": "^3.0",
+        "orchestra/testbench": "^9.0 || ^10.0",
+        "livewire/livewire": "^3.0 || ^4.0"
+    },
+    "suggest": {
+        "livewire/livewire": "Required to use the bundled Livewire builder components (^3.0 || ^4.0)."
+    },
+    "autoload": {
+        "psr-4": {
+            "LoggedCloud\\PageStudio\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "LoggedCloud\\PageStudio\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "pest"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "LoggedCloud\\PageStudio\\PageStudioServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

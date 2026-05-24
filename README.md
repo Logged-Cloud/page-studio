@@ -1,0 +1,530 @@
+# logged-cloud/page-studio
+
+A Laravel package that turns "let users build pages and routes from a form" into a small, focused product. Three stacked stages:
+
+1. **Route builder** — type a URL, right-click any segment to turn it into a reusable variable (with type, rules, and examples).
+2. **Page builder** — Shopify-style drag-and-drop block authoring, scoped to the route. Layout blocks accept nested children in named slots.
+3. **Node editor** — Blender-style node graph for composing new variables out of route values, constants, model lookups, transforms, math, image filters, and user-defined custom nodes.
+
+Designed to drop into any Livewire 3+ Laravel app.
+
+---
+
+## Screenshots
+
+The node editor: drag values out of the URL, transform them through a graph, expose the result as named variables the page can substitute.
+
+![Node editor with route_variable → uppercase → output graph](docs/screenshots/node-editor.png)
+
+The page builder: drag blocks onto the canvas, click a block to edit its settings on the right, drop variable chips into any text field.
+
+![Page builder with the content + layout palette, a selected heading, and the settings panel](docs/screenshots/page-builder.png)
+
+The route builder: every saved route in one place, with the compiled path template and the variables it references.
+
+![Saved routes list showing path templates + variables in use](docs/screenshots/route-builder.png)
+
+The variable library: every reusable variable across the project, with examples and a count of routes that wire it.
+
+![Variable library with id and userId entries, examples, and used-in counts](docs/screenshots/variable-library.png)
+
+The node palette: searchable, grouped by source / transform / image / output, with built-in + developer-defined types side by side.
+
+![Node palette rail with search input and grouped node types](docs/screenshots/node-palette.png)
+
+The in-page finder: Ctrl-F or `/` opens a palette over blocks and nodes, with type-or-text matching, keyboard navigation, and click-to-jump.
+
+![Finder overlay showing matched heading blocks and a route_variable node](docs/screenshots/finder.png)
+
+Mobile: the rails collapse to slide-in sheets, the node drawer hides by default, the canvas owns the screen. Touch users get a real surface to work on.
+
+![Page builder on a phone-width viewport with a heading, paragraph, divider, and CTA button](docs/screenshots/mobile.png)
+
+---
+
+## Install
+
+```bash
+composer require logged-cloud/page-studio
+php artisan migrate
+```
+
+Publish the config / views / migrations if you want to fork them:
+
+```bash
+php artisan vendor:publish --tag=page-studio-config
+php artisan vendor:publish --tag=page-studio-views
+php artisan vendor:publish --tag=page-studio-migrations
+```
+
+The Livewire components mount as soon as `livewire/livewire` is present:
+
+- `page-studio.route-builder`
+- `page-studio.variable-library`
+- `page-studio.page-builder`
+- `page-studio.custom-node-form`
+
+---
+
+## Quick start
+
+```blade
+{{-- Build a route with variables --}}
+@livewire('page-studio.route-builder')
+
+{{-- Once a route is saved, build a page bound to it --}}
+@livewire('page-studio.page-builder', ['routeId' => $route->id])
+
+{{-- Or skip the route entirely · pass variables in directly. Useful when
+     you only need the page builder (e.g. a campaign editor) and have
+     already-known values for things like Campaign name, Client email. --}}
+@livewire('page-studio.page-builder', [
+    'variables' => [
+        'campaign_name' => 'Summer 2026',
+        'client_email'  => 'foo@bar.com',
+    ],
+])
+
+{{-- Bind to a specific Page row by its primary key, with optional vars --}}
+@livewire('page-studio.page-builder', ['pageId' => $page->id, 'variables' => [...]])
+
+{{-- Render the saved page on the actual URL --}}
+@php
+    use LoggedCloud\PageStudio\Models\Page;
+    use LoggedCloud\PageStudio\Support\PageRenderer;
+    $page = Page::where('route_id', $route->id)->first();
+@endphp
+{!! PageRenderer::render($page->blocks, $page->previewContext()) !!}
+```
+
+---
+
+## Route builder
+
+- Type the URL into a plain input. Slashes split it into chips.
+- Click any chip to open a context menu: turn into variable / edit rules / turn back into literal / remove.
+- Variables are stored once in `page_studio_variables` and reused across routes.
+- Each variable has a **type** (int / slug / uuid / alpha / enum / any / custom), a regex/where constraint, and **N example values** used for previews + tests.
+- Examples are pre-populated per type, so a UUID variable opens with three valid UUIDs ready to save.
+
+---
+
+## Page builder
+
+- Three-pane editor: palette (left), canvas (middle), settings (right, auto-hides when nothing is selected).
+- Drag a block onto the canvas; reorder by dragging; nest blocks inside layout blocks' slots.
+- Click any text setting → drag a `{{ variableName }}` chip onto it, or right-click for a picker, or hit the `{ } var` button next to the field.
+- Built-in block types:
+
+  | Content | Layout |
+  |---|---|
+  | heading, paragraph, button, image, list, quote, code, divider, spacer | section, 2-columns, 3-columns, card, panel |
+
+- Image blocks accept image-typed variables from the node editor; the rendered page emits `<img src="…" style="filter: grayscale(1) blur(2px)">` with the chained CSS filters.
+
+---
+
+## Node editor (Blender-style)
+
+Bottom drawer on the page builder. Left palette / centre canvas / right node settings (auto-hides).
+
+### Sources
+- `source.route_variable` — pull a value out of the URL
+- `source.constant` — static string
+- `source.model_finder` — `Class::where(key, $input)->first()` · the model class picker is a populated dropdown (see *Model discovery* below)
+- `source.auth_user`, `source.auth_id`
+- `source.request` — path / method / ip / url / user_agent / host
+- `source.now` — `DateTimeImmutable`
+
+### Text transforms
+`uppercase`, `lowercase`, `trim`, `concat`, `replace`, `slugify`, `length`, `split`, `join`, `format_date`
+
+### Value transforms
+`default` (fallback when empty), `field` (data_get), `equals`, `if/else`, `first`
+
+### Math
+`transform.math` with `+ − × ÷ %` operator picker
+
+### Image pipeline
+`image.source` → 9 CSS-filter modifiers (`brightness`, `contrast`, `saturate`, `grayscale`, `sepia`, `invert`, `hue_rotate`, `blur`, `opacity`). Each node renders a **live thumbnail** showing the filter chain.
+
+### Conversions
+`convert.to_string`, `to_int`, `to_bool`, `to_array`
+
+### Output
+`output` — name the variable; it joins the page renderer's substitution context.
+
+### Notes
+`note` — yellow sticky-note nodes for in-graph documentation. No sockets, no evaluation.
+
+### Starter templates
+
+Bootstrap a route + variables + page + node graph in one shot:
+
+```bash
+php artisan page-studio:install-template               # lists available templates
+php artisan page-studio:install-template blog-post     # installs the blog post template
+php artisan page-studio:install-template user-profile --rename=profiles.show
+```
+
+Built-ins:
+
+| Slug | What it creates |
+|---|---|
+| `blog-post`    | `/blog/{slug}` route + slug variable + heading / image / paragraph page |
+| `user-profile` | `/users/{id}` route + id variable + page that resolves the id to a User and renders name + email via a model-finder graph |
+| `landing`      | `/welcome` static landing page with hero + three-column features + CTA |
+
+Custom templates: drop a class into `app/PageStudio/Templates/` extending `LoggedCloud\PageStudio\Templates\Template` and it auto-registers on boot. Override the path via the `page-studio.template_paths` config key.
+
+```php
+namespace App\PageStudio\Templates;
+
+use LoggedCloud\PageStudio\Templates\Template;
+
+class ProductTemplate extends Template
+{
+    public static function name(): string  { return 'product'; }
+    public static function label(): string { return 'Product detail'; }
+
+    public static function route(): array
+    {
+        return [
+            'name' => 'products.show', 'method' => 'GET', 'path_template' => '/products/{slug}',
+            'segments' => [
+                ['position' => 0, 'kind' => 'literal', 'literal_value' => 'products'],
+                ['position' => 1, 'kind' => 'variable', 'variable_name' => 'slug'],
+            ],
+        ];
+    }
+
+    public static function variables(): array
+    {
+        return [['name' => 'slug', 'type' => 'slug', 'examples' => ['my-product']]];
+    }
+
+    public static function blocks(): array
+    {
+        return [
+            self::block('heading',   ['text' => '{{ slug }}', 'level' => 'h1']),
+            self::block('paragraph', ['text' => 'Product description goes here.']),
+        ];
+    }
+}
+```
+
+---
+
+### Custom blocks · developer-defined
+
+The page-builder's block palette uses the same code-defined pattern. Drop a class into `app/PageStudio/Blocks/` extending `LoggedCloud\PageStudio\Blocks\BlockType`:
+
+```php
+namespace App\PageStudio\Blocks;
+
+use LoggedCloud\PageStudio\Blocks\BlockType;
+use LoggedCloud\PageStudio\Support\PageRenderer;
+
+class CalloutBlock extends BlockType
+{
+    public static function key(): string   { return 'callout'; }
+    public static function label(): string { return 'Callout'; }
+    public static function icon(): string  { return '⚠'; }
+    public static function group(): string { return 'content'; }
+
+    public static function settings(): array
+    {
+        return [
+            'tone' => ['kind' => 'select', 'label' => 'Tone', 'default' => 'info',
+                'options' => ['info' => 'Info', 'warning' => 'Warning', 'danger' => 'Danger']],
+            'text' => ['kind' => 'textarea', 'label' => 'Text', 'default' => ''],
+        ];
+    }
+
+    public function render(array $settings, array $children, array $context, bool $decorate = false): string
+    {
+        $text = PageRenderer::renderText((string) ($settings['text'] ?? ''), $context, $decorate);
+        return sprintf('<aside class="callout callout--%s">%s</aside>', $settings['tone'] ?? 'info', $text);
+    }
+}
+```
+
+Layout blocks (with named children) declare `slots()`:
+
+```php
+public static function slots(): array
+{
+    return ['header' => ['label' => 'Header'], 'body' => ['label' => 'Body']];
+}
+
+public function render(array $settings, array $children, array $context, bool $decorate = false): string
+{
+    $header = PageRenderer::renderChildren($children, 'header', $context, $decorate);
+    $body   = PageRenderer::renderChildren($children, 'body',   $context, $decorate);
+    return "<section><header>{$header}</header>{$body}</section>";
+}
+```
+
+Auto-discovery walks `app/PageStudio/Blocks/` (subdirectories included). Override via:
+
+```php
+// config/page-studio.php
+'block_paths' => [
+    ['dir' => app_path('PageStudio/Blocks'),     'namespace' => 'App\\PageStudio\\Blocks'],
+    ['dir' => app_path('Domain/Marketing/Blocks'),'namespace' => 'App\\Domain\\Marketing\\Blocks'],
+],
+```
+
+Built-in block types now ship as `BlockType` subclasses under `LoggedCloud\PageStudio\Blocks\Builtin\` (heading, paragraph, button, divider, spacer · the remaining content + layout blocks still serve from the legacy match() renderer pending conversion). The pattern is identical to the node system below.
+
+---
+
+### Custom nodes · developer-defined
+
+Drop a class into `app/PageStudio/Nodes/` that extends `LoggedCloud\PageStudio\Nodes\NodeType` and the package auto-registers it on boot · the class becomes a first-class palette type alongside the built-in sources / transforms / image / output nodes.
+
+```php
+namespace App\PageStudio\Nodes;
+
+use LoggedCloud\PageStudio\Nodes\NodeType;
+
+class GreetingNode extends NodeType
+{
+    public static function key(): string   { return 'custom.greeting'; }
+    public static function label(): string { return 'Greeting'; }
+    public static function icon(): string  { return '👋'; }
+    public static function group(): string { return 'transform'; }
+
+    public static function inputs(): array
+    {
+        return ['name' => ['label' => 'Name', 'type' => 'string']];
+    }
+
+    public static function outputs(): array
+    {
+        return ['value' => ['label' => 'Greeting', 'type' => 'string']];
+    }
+
+    public static function settings(): array
+    {
+        return ['greeting' => ['kind' => 'text', 'label' => 'Greeting', 'default' => 'Hello']];
+    }
+
+    public function evaluate(array $inputs, array $settings, array $context): array
+    {
+        return ['value' => sprintf('%s, %s!', $settings['greeting'] ?? 'Hello', $inputs['name'] ?? 'friend')];
+    }
+}
+```
+
+Auto-discovery scans `app/PageStudio/Nodes/` (sub-directories included). To register from elsewhere, override the path in config:
+
+```php
+// config/page-studio.php
+'node_paths' => [
+    ['dir' => app_path('PageStudio/Nodes'),     'namespace' => 'App\\PageStudio\\Nodes'],
+    ['dir' => app_path('Domain/Catalog/Nodes'), 'namespace' => 'App\\Domain\\Catalog\\Nodes'],
+],
+```
+
+You can also register explicitly:
+
+```php
+use LoggedCloud\PageStudio\Nodes\NodeRegistry;
+
+NodeRegistry::register(\App\PageStudio\Nodes\GreetingNode::class);
+```
+
+A reference implementation ships at `LoggedCloud\PageStudio\Nodes\Examples\GreetingNode`.
+
+> The earlier DB-backed custom-node form (`page_studio_custom_nodes`) still works for backward compatibility · code-defined classes take precedence when the key matches.
+
+### Editor interactions
+
+| Gesture | Action |
+|---|---|
+| Click palette item | Drop at default position |
+| Drag palette item → canvas | Drop at cursor |
+| Drag variable chip → canvas | Spawn a Route-variable source pre-set to that name |
+| Right-click variable chip | Same as above (auto-opens drawer) |
+| Right-click on canvas | Context menu of all variables + node types |
+| Drag output socket → input socket | Connect with a curved wire |
+| Drag output socket → empty canvas | Quick-add picker filtered by compatible input types |
+| Shift-drag mid-wire | Bend the wire through that point |
+| Alt-click wire | Clear the bend |
+| Plain click wire | Disconnect |
+| **M** in node header | Mute (input passes straight to output) |
+| **⎘** in node header / Ctrl-D | Duplicate node |
+| Click + drag canvas background | Marquee select |
+| **Delete** | Remove selected nodes + their wires |
+| **Ctrl-C / Ctrl-V** | Copy / paste a subgraph |
+| **Ctrl-Z / Ctrl-Shift-Z** | Undo / redo |
+| **Tidy** button | Auto-layout by dependency depth |
+| Drag setting number | Click + drag to scrub the value |
+| **Mini-map** in canvas corner | Click to recentre the viewport |
+| **Ctrl-scroll** | Zoom (cursor-anchored) |
+| **Middle-mouse drag** / Alt-drag | Pan |
+
+### Socket types + colour-coding
+
+`string` blue · `int` green · `bool` purple · `array` amber · `object` / `model` pink · `collection` orange · `image` teal · `any` grey. Mismatched-type wires render dashed amber.
+
+---
+
+## Variable types
+
+| Type | Where regex | Example values |
+|---|---|---|
+| int | `[0-9]+` | 1, 42, 1000 |
+| slug | `[a-z0-9](-?[a-z0-9])*` | hello-world, my-post |
+| uuid | RFC 4122 | three real UUIDs |
+| alpha | `[A-Za-z]+` | admin, guest, owner |
+| enum | `(a|b|c)` (auto from examples) | user-supplied |
+| any | `[^/]+` | anything |
+| custom | user regex | user-supplied |
+
+---
+
+## Engine internals
+
+`LoggedCloud\PageStudio\Support\NodeGraphEngine::evaluate($nodes, $edges, $baseContext)` returns the merged variable context after running the graph.
+
+- Topological order via Kahn's algorithm. Cycles silently break (back-edges skipped).
+- Implicit edge: a `source.route_variable` that reads a name written by an `output` node is auto-ordered after it, so output chains compose without explicit feedback wires.
+- Muted nodes act as 1-input → all-outputs passthrough.
+- Custom nodes run through a small `{{ inputs.X }}` / `{{ settings.Y }}` substitution DSL — no executable PHP from user content.
+
+```php
+$ctx = NodeGraphEngine::evaluate(
+    $page->nodeGraph->nodes,
+    $page->nodeGraph->edges,
+    $routeContext,
+);
+echo $ctx['displayName']; // value produced by an Output node named "displayName"
+```
+
+---
+
+## Theming
+
+The studio's chrome (drawer, palette, node headers, settings panel) honours a small set of CSS variables you can override from the host app's main stylesheet:
+
+```css
+:root {
+    --surface:    #16171a;  /* studio background        */
+    --surface-2:  #1E1F22;  /* drawer + node body       */
+    --line:       #3A3D40;  /* borders                  */
+    --ink:        #F0EDE5;  /* primary text             */
+    --ink-dim:    #A3A099;  /* secondary text           */
+    --accent:     #2C66E8;  /* selection / actions      */
+    --danger:     #ef4444;  /* destructive affordances  */
+}
+```
+
+Group-tinted node headers use literal hexes (`#3b82f6`, `#22c55e`, `#14b8a6`, `#f43f5e`, `#fde68a`); override them with more specific selectors when you need to rebrand sources / transforms / image / output / note.
+
+## Events
+
+The package fires four Laravel events on saves so the host app can audit, invalidate caches, or sync to other systems:
+
+```php
+use LoggedCloud\PageStudio\Events\{RouteSaved, PageSaved, GraphSaved, CustomNodeSaved};
+
+Event::listen(PageSaved::class, function (PageSaved $e) {
+    Cache::tags(['cms'])->flush();
+    // $e->page, $e->user
+});
+```
+
+## Permissions
+
+Set `config('page-studio.gate')` to a gate name and every Livewire mount calls `Gate::allows()`:
+
+```php
+// config/page-studio.php
+'gate' => 'page-studio.manage',
+
+// AppServiceProvider
+Gate::define('page-studio.manage', fn ($user) => $user->is_admin);
+```
+
+Default is `null` (no gate, no check).
+
+## Model discovery
+
+The Model finder node's *Model FQCN* setting is a dropdown of every Eloquent class found under `app/Models/`. The list is cached at `bootstrap/cache/page-studio-models.php` by an artisan command:
+
+```bash
+php artisan page-studio:discover-models
+# Cached 7 model(s) → bootstrap/cache/page-studio-models.php
+```
+
+Hook it into `composer install` so the dropdown is always current — add one line to your host app's `composer.json`:
+
+```json
+"scripts": {
+    "post-autoload-dump": [
+        "Illuminate\\Foundation\\ComposerScripts::postAutoloadDump",
+        "@php artisan package:discover --ansi",
+        "@php artisan page-studio:discover-models --ansi"
+    ]
+}
+```
+
+If the cache file is missing the service provider falls back to scanning `app/Models` at boot, so development environments work without the hook.
+
+### Model fields as output sockets
+
+Toggle the small **⚏** button on a `Model finder` node header (or flip *Expose fields as outputs* in the right panel) to switch the node from a single `model` output to one socket per column. Sockets are typed from the live database schema (`int` / `string` / `bool` / `array`) so wires colour-code automatically and the engine emits each attribute through its named socket. Toggle it back to collapse the columns into one collection-shaped `model` output again.
+
+Options:
+
+```bash
+php artisan page-studio:discover-models \
+    --dir=app/Domain/Catalog/Models \
+    --namespace="App\\Domain\\Catalog\\Models"
+```
+
+When no models are found the field degrades to a free-text input.
+
+---
+
+## Disabling parts of the editor
+
+Hide individual node or block types from the palette, the context menu, and the quick-add picker:
+
+```php
+// config/page-studio.php
+'disabled_nodes'  => ['source.auth_user', 'transform.math'],
+'disabled_blocks' => ['code', 'quote'],
+```
+
+Disabled types are also refused by the server-side `addNode()` / `addBlock()` methods, so a host app cannot reach a hidden type by hand-crafting a Livewire call.
+
+Turn off the bottom-drawer node editor entirely (pages-only authoring):
+
+```php
+'enable_node_editor' => false,
+```
+
+Existing saved graphs still evaluate at render time so any output variables they produce keep flowing into pages, but the drawer button is hidden, `toggleDrawer()` is a no-op, and the canvas mount forces `drawerOpen = false`.
+
+---
+
+## Testing
+
+```bash
+composer test
+```
+
+The package ships **130+ Pest tests** covering the parser, route compiler, block tree, page renderer, variable types, every node evaluator, undo/redo, copy/paste, wire bends, and custom-node template substitution.
+
+The `page-studio-lab` consumer app ships **20 Dusk tests** that drive Selenium against the live editor: palette click/drag, var insertion, socket connect, node remove + wire cleanup, Tidy, undo/redo, mute, duplicate, image pipeline → variable context, autosave persistence, marquee remove, wire bend persistence, and end-to-end custom-node use.
+
+---
+
+## License
+
+Fair Source License 1.1 ([FSL-1.1-MIT](LICENSE)). Free for internal use, education, research, and professional-services work. Reselling the package as a competing product or service is not permitted. Converts to MIT two years after the release date.
+
+If you're a company that wants to use the studio outside the permitted purposes today, get in touch about a commercial licence.

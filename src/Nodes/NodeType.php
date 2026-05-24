@@ -1,0 +1,90 @@
+<?php
+
+namespace LoggedCloud\PageStudio\Nodes;
+
+/**
+ * Developer-defined custom node base · drop a subclass into
+ * `app/PageStudio/Nodes/` (or register it explicitly via
+ * `NodeRegistry::register`) and it shows up alongside the built-in
+ * source / transform / image / output palette.
+ *
+ * Override the static descriptors to describe the node, implement
+ * `evaluate()` to compute its outputs from its inputs + settings.
+ */
+abstract class NodeType
+{
+    /** Unique identifier · convention `custom.<snake_name>`. */
+    abstract public static function key(): string;
+
+    /** Label shown in palettes + node headers. */
+    abstract public static function label(): string;
+
+    /** Emoji / glyph rendered in the node header. */
+    public static function icon(): string
+    {
+        return '◆';
+    }
+
+    /** Palette section · 'source' | 'transform' | 'image' | 'output' | 'note'. */
+    public static function group(): string
+    {
+        return 'transform';
+    }
+
+    /** @return array<string, array{label?: string, type?: string}> */
+    public static function inputs(): array
+    {
+        return [];
+    }
+
+    /** @return array<string, array{label?: string, type?: string}> */
+    public static function outputs(): array
+    {
+        return ['value' => ['label' => 'Value', 'type' => 'any']];
+    }
+
+    /**
+     * Per-node setting fields rendered into the right panel. Each entry
+     * follows the same shape as the built-in node config:
+     *   ['kind' => 'text|number|select|bool|upload|textarea|url',
+     *    'label' => '...', 'default' => ..., 'options' => [...]]
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public static function settings(): array
+    {
+        return [];
+    }
+
+    /**
+     * Run the node. `$inputs` is keyed by input socket name with the
+     * resolved upstream value, `$settings` is the node's per-instance
+     * settings, `$context` is the page's variable context. Return the
+     * output socket values keyed by output socket name.
+     *
+     * @param array<string, mixed> $inputs
+     * @param array<string, mixed> $settings
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    abstract public function evaluate(array $inputs, array $settings, array $context): array;
+
+    /**
+     * Return the config-shape the rest of the studio (palette renderer,
+     * canvas, engine fallbacks) reads from `page-studio.nodes`. The
+     * `class` key lets the engine round-trip back to the implementation.
+     */
+    public static function toLibraryEntry(): array
+    {
+        return [
+            'group'    => static::group(),
+            'label'    => static::label(),
+            'icon'     => static::icon(),
+            'inputs'   => static::inputs(),
+            'outputs'  => static::outputs(),
+            'settings' => static::settings(),
+            'custom'   => true,
+            'class'    => static::class,
+        ];
+    }
+}

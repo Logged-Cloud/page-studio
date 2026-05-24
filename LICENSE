@@ -1,0 +1,78 @@
+Fair Source License, version 1.1
+
+Abbreviation: FSL-1.1-MIT
+
+Acceptance
+
+In order to get any license under these terms, you must agree to them as both
+strict obligations and conditions to all your licenses.
+
+Copyright License
+
+The licensor grants you a copyright license for the Software to do everything
+you might do with the Software that would otherwise infringe the licensor's
+copyright in it for any permitted purpose. However, you may only distribute
+the Software according to Distribution License and make changes or new works
+based on the Software according to Changes and New Works License.
+
+Patent License
+
+The licensor grants you a patent license for the Software that covers patent
+claims the licensor can license, or becomes able to license, that you would
+infringe by using the Software in the form provided by the licensor, for any
+permitted purpose. This patent license is not in the form of a present grant,
+but rather a promise not to sue.
+
+Changes and New Works License
+
+The licensor grants you the right to use changes you make to the Software or
+new works based on the Software for any permitted purpose, but it does not
+grant you the right to distribute the Software or new works based on it
+except under Distribution License.
+
+Distribution License
+
+The licensor grants you an additional copyright license to distribute copies
+of the Software. Your license to distribute covers distributing the Software
+with changes and new works permitted by Changes and New Works License.
+
+Notices
+
+You must ensure that anyone who gets a copy of any part of the Software from
+you also gets a copy of these terms, as well as the following copyright notice:
+
+This software is Copyright (c) 2026 Charles Lennon.
+
+Permitted Purpose
+
+A "permitted purpose" is any purpose other than a Competing Use. A "Competing
+Use" means making the Software available to others in a commercial product or
+service that:
+
+1. substitutes for the Software;
+2. substitutes for any other product or service we offer using the Software
+   that exists as of the date we make the Software available; or
+3. offers the same or substantially similar functionality as the Software.
+
+Permitted purposes specifically include using the Software:
+
+1. for your internal use and access;
+2. for non-commercial education;
+3. for non-commercial research; and
+4. in connection with professional services that you provide to a licensee
+   (not avoiding our offerings) for a fee.
+
+Fallback License
+
+On the second anniversary of the date the Software is made available, the
+Software is also made available under the MIT License.
+
+DISCLAIMER
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
