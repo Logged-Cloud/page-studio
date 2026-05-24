@@ -30,4 +30,12 @@ class HeadingBlock extends BlockType
         $text = PageRenderer::renderText((string) ($settings['text'] ?? ''), $context, $decorate);
         return sprintf('<%1$s style="text-align:%3$s;margin:.5em 0">%2$s</%1$s>', $tag, $text, $align);
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $level = (int) substr((string) ($settings['level'] ?? 'h2'), 1);
+        $prefix = str_repeat('#', max(1, min(4, $level)));
+        $text = PageRenderer::substitute((string) ($settings['text'] ?? ''), $context);
+        return "{$prefix} {$text}\n\n";
+    }
 }

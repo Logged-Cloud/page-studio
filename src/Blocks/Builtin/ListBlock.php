@@ -45,4 +45,19 @@ class ListBlock extends BlockType
         }
         return $html."</$tag>";
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $lines = preg_split('/\r?\n/', trim((string) ($settings['items'] ?? ''))) ?: [];
+        $lines = array_values(array_filter($lines, fn ($l) => trim($l) !== ''));
+        if (! $lines) return '';
+
+        $numbered = ($settings['style'] ?? 'bullet') === 'number';
+        $out = '';
+        foreach ($lines as $i => $line) {
+            $marker = $numbered ? ($i + 1).'.' : '-';
+            $out .= "{$marker} ".PageRenderer::substitute(trim($line), $context)."\n";
+        }
+        return $out."\n";
+    }
 }

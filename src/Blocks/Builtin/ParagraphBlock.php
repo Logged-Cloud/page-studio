@@ -25,4 +25,9 @@ class ParagraphBlock extends BlockType
             .nl2br(PageRenderer::renderText((string) ($settings['text'] ?? ''), $context, $decorate))
             .'</p>';
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::substitute((string) ($settings['text'] ?? ''), $context)."\n\n";
+    }
 }

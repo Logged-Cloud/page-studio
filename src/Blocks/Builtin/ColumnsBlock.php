@@ -81,4 +81,10 @@ class ColumnsBlock extends BlockType
             $leftW, $rightW, $half, $left, $right,
         );
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::renderChildrenForText($children, 'left',  $context)
+             . PageRenderer::renderChildrenForText($children, 'right', $context);
+    }
 }

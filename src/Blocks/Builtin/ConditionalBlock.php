@@ -63,4 +63,18 @@ class ConditionalBlock extends BlockType
             .'<small style="color:#64748b">Hidden when <code>'.htmlspecialchars($name, ENT_QUOTES).'</code> is not '
             .htmlspecialchars((string) ($settings['mode'] ?? 'truthy'), ENT_QUOTES).'</small>'.$body.'</div>';
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $name  = trim((string) ($settings['variable'] ?? ''));
+        $value = $context[$name] ?? data_get($context, $name);
+
+        $satisfied = match ($settings['mode'] ?? 'truthy') {
+            'falsy'  => empty($value),
+            'equals' => (string) $value === (string) ($settings['compare'] ?? ''),
+            default  => (bool) $value,
+        };
+
+        return $satisfied ? PageRenderer::renderChildrenForText($children, 'body', $context) : '';
+    }
 }

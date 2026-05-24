@@ -28,4 +28,9 @@ class SpacerBlock extends BlockType
         };
         return sprintf('<div style="height:%s" aria-hidden="true"></div>', $height);
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return "\n";
+    }
 }

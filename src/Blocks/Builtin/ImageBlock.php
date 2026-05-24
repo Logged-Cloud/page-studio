@@ -42,4 +42,11 @@ class ImageBlock extends BlockType
         $altE = htmlspecialchars(PageRenderer::substitute($alt,    $context, false), ENT_QUOTES | ENT_HTML5, 'UTF-8');
         return '<img src="'.$src.'" alt="'.$altE.'" style="max-width:100%;height:auto;display:block;margin:.65em 0">';
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $src = PageRenderer::substitute((string) ($settings['src'] ?? ''), $context);
+        $alt = (string) ($settings['alt'] ?? '');
+        return $alt !== '' ? "[image: {$alt}] {$src}\n\n" : "[image] {$src}\n\n";
+    }
 }

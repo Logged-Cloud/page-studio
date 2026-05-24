@@ -14,4 +14,9 @@ class DividerBlock extends BlockType
     {
         return '<hr style="border:none;border-top:1px solid #d0d5dd;margin:1em 0">';
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return "---\n\n";
+    }
 }

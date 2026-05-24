@@ -87,6 +87,17 @@ abstract class BlockType
     }
 
     /**
+     * Plain-text renderer · pairs with `PageRenderer::renderForText()` to
+     * produce the text/plain half of a multipart email. Return null and
+     * the walker falls back to stripping HTML from `render()` · override
+     * when the default strip loses structure (lists, headings, tables).
+     */
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return null;
+    }
+
+    /**
      * Library entry · palette renderer + page builder schema lookup read
      * this exact shape from `config('page-studio.blocks')`.
      */
