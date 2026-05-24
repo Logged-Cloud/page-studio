@@ -14,11 +14,16 @@
     class="ps-pb-block-wrap"
     :class="selectedPath === @js($path) ? 'is-selected' : ''"
     wire:key="block-{{ $block['id'] }}"
+    data-block-path="{{ $path }}"
+    data-parent-path="{{ $parentPath }}"
+    data-slot="{{ $slot === null ? '' : $slot }}"
+    data-index="{{ $index }}"
     @click.stop="$wire.selectBlock(@js($path))"
     draggable="true"
     @dragstart.stop="onBlockDragStart($event, @js($path))"
     @dragover.prevent.stop="onBlockDragOver($event, @js($parentPath), {{ $slotJson }}, {{ $index }})"
     @drop.prevent.stop="onBlockDrop($event, @js($parentPath), {{ $slotJson }}, {{ $index }})"
+    @pointerdown="startTouchDrag($event, 'block', @js($path), @js($block['type']))"
 >
     <div class="ps-pb-block-handle">
         <span class="ps-pb-block-type">{{ $schema['label'] ?? $block['type'] }}</span>
@@ -44,6 +49,8 @@
                 @php $kids = $block['children'][$slotKey] ?? []; @endphp
                 <div class="ps-pb-slot"
                      data-slot="{{ $slotKey }}"
+                     data-parent-path="{{ $path }}"
+                     data-kid-count="{{ count($kids) }}"
                      @dragover.prevent.stop="onSlotDragOver($event, @js($path), @js($slotKey), {{ count($kids) }})"
                      @drop.prevent.stop="onSlotDrop($event, @js($path), @js($slotKey))">
                     <div class="ps-pb-slot-label">{{ is_array($slotLabel) ? ($slotLabel['label'] ?? $slotKey) : $slotLabel }}</div>

@@ -147,6 +147,7 @@
                                         class="ps-pb-palette-item"
                                         draggable="true"
                                         @dragstart.stop="onPaletteDragStart($event, @js($type))"
+                                        @pointerdown="startTouchDrag($event, 'palette', @js($type), @js($def['label']))"
                                         @click="$wire.addBlock(@js($type))"
                                         title="Drag onto the canvas or click to append">
                                     <span class="ps-pb-palette-icon">{{ $def['icon'] }}</span>
@@ -998,6 +999,105 @@
 
                 window.pageStudioPageBuilder = function () {
                     return {
+                        // Touch DnD · HTML5 DragEvent doesn't fire on touchscreens,
+                        // so a parallel pointer-event path drives the same drop
+                        // commit. Long-press kicks the gesture into drag mode
+                        // (without it every tap would start dragging).
+                        touchDrag: { active: false, kind: null, payload: null, label: '', x: 0, y: 0, timer: null, pointerId: null, target: null },
+
+                        startTouchDrag(e, kind, payload, label) {
+                            if (e.pointerType !== 'touch') return;
+                            this.touchDrag.target  = e.currentTarget;
+                            this.touchDrag.pointerId = e.pointerId;
+                            this.touchDrag.kind    = kind;
+                            this.touchDrag.payload = payload;
+                            this.touchDrag.label   = label;
+                            this.touchDrag.x       = e.clientX;
+                            this.touchDrag.y       = e.clientY;
+                            if (this.touchDrag.timer) clearTimeout(this.touchDrag.timer);
+                            this.touchDrag.timer = setTimeout(() => this.activateTouchDrag(), 220);
+                            // Capture so the move + up events fire on this element
+                            // even when the finger leaves it.
+                            try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {}
+                            window.addEventListener('pointermove', this.boundTouchMove, { passive: false });
+                            window.addEventListener('pointerup',   this.boundTouchEnd);
+                            window.addEventListener('pointercancel', this.boundTouchEnd);
+                        },
+
+                        activateTouchDrag() {
+                            this.touchDrag.active = true;
+                            this.dragKind = this.touchDrag.kind;
+                            this.dragPayload = this.touchDrag.payload;
+                            document.body.style.touchAction = 'none';
+                            document.body.style.userSelect = 'none';
+                        },
+
+                        onTouchMove(e) {
+                            if (! this.touchDrag.kind) return;
+                            // Cancel the long-press if the finger leaves the start
+                            // point before the threshold fires.
+                            if (! this.touchDrag.active) {
+                                if (Math.hypot(e.clientX - this.touchDrag.x, e.clientY - this.touchDrag.y) > 8) {
+                                    if (this.touchDrag.timer) { clearTimeout(this.touchDrag.timer); this.touchDrag.timer = null; }
+                                    this.cancelTouchDrag();
+                                }
+                                return;
+                            }
+                            e.preventDefault();
+                            this.touchDrag.x = e.clientX;
+                            this.touchDrag.y = e.clientY;
+
+                            // Identify what's under the finger · prefer the deepest
+                            // slot, then a block wrapper, then the canvas as a root drop.
+                            const el = document.elementFromPoint(e.clientX, e.clientY);
+                            if (! el) return;
+                            const slot   = el.closest('.ps-pb-slot');
+                            const block  = el.closest('.ps-pb-block-wrap');
+                            const canvas = el.closest('.ps-pb-canvas');
+
+                            if (slot) {
+                                this.dropTarget = {
+                                    parentPath: slot.dataset.parentPath ?? '',
+                                    slot:       slot.dataset.slot,
+                                    index:      parseInt(slot.dataset.kidCount ?? '0'),
+                                };
+                            } else if (block) {
+                                const r = block.getBoundingClientRect();
+                                const inTopHalf = (e.clientY - r.top) < r.height / 2;
+                                const idx = parseInt(block.dataset.index ?? '0');
+                                this.dropTarget = {
+                                    parentPath: block.dataset.parentPath ?? '',
+                                    slot:       block.dataset.slot || null,
+                                    index:      inTopHalf ? idx : idx + 1,
+                                };
+                            } else if (canvas) {
+                                this.dropTarget = { parentPath: '', slot: null, index: this.segmentCount };
+                            }
+                        },
+
+                        onTouchEnd(e) {
+                            if (this.touchDrag.timer) { clearTimeout(this.touchDrag.timer); this.touchDrag.timer = null; }
+                            window.removeEventListener('pointermove', this.boundTouchMove);
+                            window.removeEventListener('pointerup',   this.boundTouchEnd);
+                            window.removeEventListener('pointercancel', this.boundTouchEnd);
+
+                            if (! this.touchDrag.active) {
+                                // Threshold never fired · let the @click handler do its
+                                // tap-to-add thing. Just clear the partial state.
+                                this.cancelTouchDrag();
+                                return;
+                            }
+                            try { this.touchDrag.target?.releasePointerCapture?.(this.touchDrag.pointerId); } catch (_) {}
+                            this.commitDrop(this.dropTarget);
+                            this.cancelTouchDrag();
+                        },
+
+                        cancelTouchDrag() {
+                            this.touchDrag = { active: false, kind: null, payload: null, label: '', x: 0, y: 0, timer: null, pointerId: null, target: null };
+                            document.body.style.touchAction = '';
+                            document.body.style.userSelect = '';
+                        },
+
                         dragKind: null,
                         dragPayload: null,
                         // Where the dragged item will land · matches the
@@ -1023,6 +1123,11 @@
                         init() {
                             this.$watch('leftCollapsed',  (v) => localStorage.setItem('psPbLeftCollapsed',  v ? '1' : '0'));
                             this.$watch('rightCollapsed', (v) => localStorage.setItem('psPbRightCollapsed', v ? '1' : '0'));
+                            // Pre-bind the touch handlers so add/remove EventListener
+                            // pair up cleanly (otherwise removeEventListener has no
+                            // way to match the original closure).
+                            this.boundTouchMove = (e) => this.onTouchMove(e);
+                            this.boundTouchEnd  = (e) => this.onTouchEnd(e);
                             // On phones close the node drawer too · it covers
                             // most of the screen and the canvas is the focus
                             // for touch users. They can re-open via Show nodes.
