@@ -176,7 +176,10 @@ class PageStudioServiceProvider extends ServiceProvider
             Blocks\Builtin\CodeBlock::class,
             Blocks\Builtin\DividerBlock::class,
             Blocks\Builtin\SpacerBlock::class,
+            Blocks\Builtin\SignatureBlock::class,
+            Blocks\Builtin\SocialBlock::class,
             // Layout
+            Blocks\Builtin\HeroBlock::class,
             Blocks\Builtin\SectionBlock::class,
             Blocks\Builtin\ColumnsBlock::class,
             Blocks\Builtin\ColumnsThreeBlock::class,
