@@ -45,6 +45,7 @@ All four features ship out of the box on v2.2+ · short-poll based (~8s heartbea
 - [Custom blocks (in this README)](#custom-blocks--developer-defined)
 - [Custom nodes (in this README)](#custom-nodes--developer-defined)
 - [Variable types](#variable-types)
+- [Render cache](#render-cache)
 - [Engine internals](#engine-internals)
 - [Theming](#theming)
 - [Events](#events)
@@ -754,6 +755,24 @@ A reference implementation ships at `LoggedCloud\PageStudio\Nodes\Examples\Greet
 | enum | `(a|b|c)` (auto from examples) | user-supplied |
 | any | `[^/]+` | anything |
 | custom | user regex | user-supplied |
+
+---
+
+## Render cache
+
+`PageRenderer::render()` (and its `renderForEmail` / `renderForText` / `renderForMarkdown` counterparts) can wrap each top-level render in `Cache::remember`, keyed by a sha1 of the block tree, variable context, and render mode. Useful on the public-facing page render path where blocks change rarely; the editor canvas always bypasses the cache (decorate mode is live by definition).
+
+Off by default so existing apps don't change behaviour. Enable in `config/page-studio.php`:
+
+```php
+'render_cache' => [
+    'enabled' => env('PAGE_STUDIO_RENDER_CACHE', true),
+    'store'   => env('PAGE_STUDIO_RENDER_CACHE_STORE'),   // null = default store
+    'ttl'     => (int) env('PAGE_STUDIO_RENDER_CACHE_TTL', 3600),
+],
+```
+
+No active invalidation needed: any change to the blocks or context yields a different sha1 and misses the cache; stale entries age out via TTL.
 
 ---
 
