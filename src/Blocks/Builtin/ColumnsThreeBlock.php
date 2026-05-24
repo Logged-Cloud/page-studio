@@ -11,6 +11,8 @@ class ColumnsThreeBlock extends BlockType
     public static function label(): string { return '3 Columns'; }
     public static function icon(): string  { return '⫼'; }
     public static function group(): string { return 'layout'; }
+    // CSS grid · same email caveat as the 2-columns block.
+    public static function emailSafe(): bool { return false; }
 
     public static function slots(): array
     {

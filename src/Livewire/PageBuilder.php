@@ -48,6 +48,15 @@ class PageBuilder extends Component
     public array $customVariables = [];
 
     /**
+     * Email mode · when true the palette hides blocks whose
+     * `emailSafe(): false` (CSS grid layouts, color-mix backgrounds,
+     * anything that doesn't survive Outlook + Gmail). Existing saved
+     * blocks of those types still evaluate and render · the gate is
+     * UI-only.
+     */
+    public bool $emailMode = false;
+
+    /**
      * Authored block tree · the root list. Layout blocks carry `children`
      * keyed by slot name; each slot is a list of nested blocks. Persisted
      * verbatim as JSON on the `pages.blocks` column.
@@ -138,11 +147,12 @@ class PageBuilder extends Component
         $this->edges  = $snap['edges']  ?? $this->edges;
     }
 
-    public function mount(?int $routeId = null, ?int $pageId = null, array $variables = []): void
+    public function mount(?int $routeId = null, ?int $pageId = null, array $variables = [], bool $emailMode = false): void
     {
         $this->authorizePageStudio();
         $this->routeId = $routeId;
         $this->pageId  = $pageId;
+        $this->emailMode = $emailMode;
         $this->customVariables = $this->normaliseVariables($variables);
 
         // Bind to a Page row by pageId first, then fall back to the legacy
@@ -266,6 +276,13 @@ class PageBuilder extends Component
      */
     public function addBlock(string $type, string $parentPath = '', ?string $slot = null, ?int $index = null): void
     {
+        // Email mode · refuse blocks the BlockType marks as not email-safe
+        // so wire-callers can't sidestep the palette filter.
+        if ($this->emailMode) {
+            $schema = config("page-studio.blocks.$type");
+            if (is_array($schema) && ($schema['email_safe'] ?? true) === false) return;
+        }
+
         $block = BlockFactory::make($type);
         if (! $block) return;
 
@@ -1032,6 +1049,9 @@ class PageBuilder extends Component
         $grouped = [];
         foreach ($library as $key => $def) {
             if (isset($disabled[$key])) continue;
+            // Email mode · drop blocks that declare themselves unsafe for
+            // email clients (CSS grid layouts, color-mix backgrounds, ...).
+            if ($this->emailMode && ($def['email_safe'] ?? true) === false) continue;
             $g = $def['group'] ?? 'content';
             $grouped[$g][$key] = $def;
         }
