@@ -8,6 +8,15 @@ A Laravel package that turns "let users build pages and routes from a form" into
 
 Designed to drop into any Livewire 3+ Laravel app.
 
+**Multiple authors on the same page**, no WebSocket dependency:
+
+- **Block locks** · the block another reviewer is editing dims with a "🔒 Alice editing" ribbon. 30-second TTL with a refreshable lease, so a closed tab releases the lock automatically.
+- **Presence chips** in the top bar show who else is currently viewing the page (initials per peer, full name on hover).
+- **Review threads** · per-block comment threads with replies and a resolve / re-open lifecycle. Indicator pips on each block show open-thread counts; the right-rail Comments tab opens the full discussion. `page-studio:comment:added` event fires per post for Slack / channel-partner integrations.
+- **Activity feed** in the right rail records save / publish / comment / lock events with verb icons in reverse-chronological order. Per-page audit trail, no extra service to run.
+
+All four features ship out of the box on v2.2+ · short-poll based (~8s heartbeat), pluggable for a Reverb / Pusher swap later.
+
 > **Extending the studio?** Step-by-step tutorials live under `docs/tutorials/`:
 > [Custom block](docs/tutorials/custom-blocks.md) · [Custom node](docs/tutorials/custom-nodes.md) · [Custom template](docs/tutorials/custom-templates.md) · [Theming + light mode](docs/tutorials/theming.md) · [Migrate HTML content](docs/tutorials/migrate-html.md)
 
@@ -16,6 +25,7 @@ Designed to drop into any Livewire 3+ Laravel app.
 ## Contents
 
 - [Screenshots](#screenshots)
+- [Collaboration](#collaboration) · block locks, presence, comments, activity feed
 - [Install](#install)
 - [Quick start](#quick-start)
 - [Passing variables in](#passing-variables-in)
@@ -75,6 +85,36 @@ The in-page finder: Ctrl-F or `/` opens a palette over blocks and nodes, with ty
 Mobile: the rails collapse to slide-in sheets, the node drawer hides by default, the canvas owns the screen. Touch users get a real surface to work on.
 
 ![Page builder on a phone-width viewport with a heading, paragraph, divider, and CTA button](docs/screenshots/mobile.png)
+
+---
+
+## Collaboration
+
+Two people authoring the same page get a polling-based collaboration layer · no WebSocket dependency, no extra service to run.
+
+### Block locks
+
+When one author opens a block in the right-panel settings, an exclusive lease is taken for ~30 seconds (refreshed every 8s by a heartbeat). Other reviewers see the block dimmed with a ribbon naming the current editor and can't accidentally clobber the change.
+
+![Block lock ribbon on a heading block · "🔒 Alice editing"](docs/screenshots/collab-block-lock.png)
+
+### Presence chips
+
+The top bar surfaces the other peers currently editing the page as initials chips. Hover for the full name + last-seen timestamp. Closed tabs drop out of presence within the heartbeat window.
+
+![Presence chips in the top bar showing two other active peers](docs/screenshots/collab-presence.png)
+
+### Review threads
+
+Every block can carry a comment thread · 💬 button in the block handle starts a new thread; the right rail Comments tab gathers every open thread on the page. Replies nest under the parent; resolved threads collapse but stay in the history. The block wrap shows a red pip with the open count so unresolved threads are obvious at a glance.
+
+![Right rail Comments tab with one open thread and a nested reply, plus a red pip on the parent block](docs/screenshots/collab-comments.png)
+
+### Activity feed
+
+The right rail's Activity tab is a per-page audit · save / publish / comment / lock-acquire events with verb icons in reverse-chronological order. Drops you into the editor's history without needing a separate audit log service.
+
+![Activity feed listing recent saves, a publish, and a comment with verb icons](docs/screenshots/collab-activity.png)
 
 ---
 
