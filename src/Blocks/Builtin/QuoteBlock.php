@@ -29,4 +29,15 @@ class QuoteBlock extends BlockType
             .($cite !== '' ? '<footer style="margin-top:.35em;font-size:.85em;color:#666;font-style:normal">— '.PageRenderer::renderText($cite, $context, $decorate).'</footer>' : '')
             .'</blockquote>';
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $text = PageRenderer::substitute((string) ($settings['text'] ?? ''), $context);
+        $cite = (string) ($settings['cite'] ?? '');
+        $body = "> ".str_replace("\n", "\n> ", $text)."\n";
+        if ($cite !== '') {
+            $body .= "  - ".PageRenderer::substitute($cite, $context)."\n";
+        }
+        return $body."\n";
+    }
 }

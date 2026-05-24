@@ -43,4 +43,11 @@ class ButtonBlock extends BlockType
             $label,
         );
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $label = PageRenderer::substitute((string) ($settings['label'] ?? ''), $context);
+        $href  = PageRenderer::substitute((string) ($settings['href']  ?? '#'), $context);
+        return "{$label}: {$href}\n\n";
+    }
 }

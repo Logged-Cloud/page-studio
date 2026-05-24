@@ -87,4 +87,18 @@ class CardBlock extends BlockType
             $body     !== '' ? $body : '',
         );
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $title    = PageRenderer::substitute((string) ($settings['title']    ?? ''), $context);
+        $subtitle = PageRenderer::substitute((string) ($settings['subtitle'] ?? ''), $context);
+        $body     = PageRenderer::renderChildrenForText($children, 'body', $context);
+
+        $out = '';
+        if ($title    !== '') $out .= "{$title}\n";
+        if ($subtitle !== '') $out .= "{$subtitle}\n";
+        if ($out !== '')      $out .= "\n";
+        $out .= $body;
+        return $out;
+    }
 }

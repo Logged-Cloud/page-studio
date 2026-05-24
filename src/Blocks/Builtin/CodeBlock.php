@@ -27,4 +27,11 @@ class CodeBlock extends BlockType
             htmlspecialchars((string) ($settings['code'] ?? ''),     ENT_QUOTES | ENT_HTML5, 'UTF-8'),
         );
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        $code = (string) ($settings['code'] ?? '');
+        $lang = (string) ($settings['language'] ?? '');
+        return "\n```{$lang}\n{$code}\n```\n\n";
+    }
 }

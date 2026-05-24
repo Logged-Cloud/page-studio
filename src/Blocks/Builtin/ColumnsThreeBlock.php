@@ -67,4 +67,11 @@ class ColumnsThreeBlock extends BlockType
             $half, $left, $middle, $right,
         );
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::renderChildrenForText($children, 'left',   $context)
+             . PageRenderer::renderChildrenForText($children, 'middle', $context)
+             . PageRenderer::renderChildrenForText($children, 'right',  $context);
+    }
 }

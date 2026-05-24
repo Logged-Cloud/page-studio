@@ -251,12 +251,17 @@ Pass `emailMode => true` to hide palette entries marked `email_safe: false` (hos
 
 To produce the email HTML, use `PageRenderer::renderForEmail()` instead of `render()`. Blocks that override `renderEmail()` emit nested-table markup that survives Outlook + Gmail; blocks without an override fall through to the regular renderer.
 
+For the plain-text half of a multipart email (RFC requires both), use `PageRenderer::renderForText()`. Headings come out as `#` prefixes, lists become `-` / `1.` bullets, buttons render as `Label: url`, tables become tab-separated rows · everything that survives a plain-text inbox.
+
 ```php
-$html = PageRenderer::renderForEmail($page->blocks, [
-    'program' => $program,
-    'user'    => $recipient,
-]);
-Mail::raw($html, fn ($m) => $m->to($recipient));
+$html = PageRenderer::renderForEmail($page->blocks, ['user' => $recipient]);
+$text = PageRenderer::renderForText($page->blocks, ['user' => $recipient]);
+
+Mail::send([], [], function ($m) use ($recipient, $html, $text) {
+    $m->to($recipient)->subject('Hi')
+      ->html($html)
+      ->text($text);
+});
 ```
 
 Each `BlockType` declares its own compatibility via `public static function emailSafe(): bool` and an optional `public function renderEmail(...): ?string`:

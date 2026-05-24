@@ -185,4 +185,68 @@ class PageRenderer
         $kids = $children[$slot] ?? [];
         return is_array($kids) ? self::renderForEmail($kids, $context, $decorate) : '';
     }
+
+    /**
+     * Plain-text counterpart to `render()` · produces the text/plain half
+     * of a multipart email. Each block's `renderText()` is preferred;
+     * blocks without an override fall back to stripping HTML from their
+     * regular render output.
+     */
+    public static function renderForText(array $blocks, array $context = []): string
+    {
+        $out = '';
+        foreach ($blocks as $block) {
+            $out .= self::renderBlockForText($block, $context);
+        }
+        // Collapse runaway blank lines + ensure the body ends with one
+        // trailing newline so the output drops cleanly into a Mail::raw.
+        $out = preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
+        return rtrim($out, "\n")."\n";
+    }
+
+    public static function renderBlockForText(array $block, array $context = []): string
+    {
+        $type = $block['type'] ?? null;
+        if (! $type) return '';
+        $class = \LoggedCloud\PageStudio\Blocks\BlockRegistry::find($type);
+        if (! $class) return '';
+
+        try {
+            /** @var \LoggedCloud\PageStudio\Blocks\BlockType $instance */
+            $instance = new $class();
+            $settings = $block['settings']        ?? [];
+            $children = is_array($block['children'] ?? null) ? $block['children'] : [];
+
+            $text = $instance->renderText($settings, $children, $context);
+            if ($text !== null) return $text;
+
+            // Fallback · take the regular HTML render, drop tags, decode
+            // entities, collapse whitespace. Good enough for plain content
+            // blocks that don't bother with an override.
+            $html = $instance->render($settings, $children, $context, false);
+            return self::stripToText($html);
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    public static function renderChildrenForText(array $children, string $slot, array $context): string
+    {
+        $kids = $children[$slot] ?? [];
+        return is_array($kids) ? self::renderForText($kids, $context) : '';
+    }
+
+    /**
+     * Strip HTML to readable plain text · used as the fallback shape when a
+     * block doesn't ship its own `renderText()`.
+     */
+    public static function stripToText(string $html): string
+    {
+        $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $text = strip_tags($text);
+        $text = preg_replace('/[ \t]+/u', ' ', $text) ?? $text;
+        $text = preg_replace("/\n[ \t]+/", "\n", $text) ?? $text;
+        $text = preg_replace("/\n{3,}/", "\n\n", $text) ?? $text;
+        return trim($text)."\n\n";
+    }
 }

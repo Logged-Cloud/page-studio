@@ -53,4 +53,9 @@ class SectionBlock extends BlockType
             $bg, $pad, $body,
         );
     }
+
+    public function renderText(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::renderChildrenForText($children, 'body', $context);
+    }
 }
