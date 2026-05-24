@@ -236,7 +236,7 @@ pattern shows up, the page-builder fits.
 
 Replace a CKEditor / TinyMCE textarea in a Livewire component. Variables come from the controller (booking, customer, program), the editor saves blocks, your existing send pipeline calls `PageRenderer::render()` on those blocks to produce the email HTML.
 
-Pass `emailMode => true` and the palette hides blocks that don't survive Outlook + Gmail (the CSS-grid columns + the color-mix card). Authors only see the blocks that render correctly in an inbox:
+Pass `emailMode => true` to hide palette entries marked `email_safe: false` (host-app blocks that depend on CSS the inbox won't honour):
 
 ```blade
 @livewire('page-studio.page-builder', [
@@ -249,7 +249,37 @@ Pass `emailMode => true` and the palette hides blocks that don't survive Outlook
 ])
 ```
 
-Each `BlockType` declares its own compatibility via `public static function emailSafe(): bool` (defaults to true). Override on a custom block when its CSS won't reach an email client cleanly, and the page-builder filters it out automatically in email mode.
+To produce the email HTML, use `PageRenderer::renderForEmail()` instead of `render()`. Blocks that override `renderEmail()` emit nested-table markup that survives Outlook + Gmail; blocks without an override fall through to the regular renderer.
+
+```php
+$html = PageRenderer::renderForEmail($page->blocks, [
+    'program' => $program,
+    'user'    => $recipient,
+]);
+Mail::raw($html, fn ($m) => $m->to($recipient));
+```
+
+Each `BlockType` declares its own compatibility via `public static function emailSafe(): bool` and an optional `public function renderEmail(...): ?string`:
+
+```php
+class HeroCallout extends BlockType
+{
+    public static function emailSafe(): bool { return true; }
+
+    public function render(array $settings, array $children, array $context, bool $decorate = false): string
+    {
+        // Web · uses flex / grid, modern colour functions.
+    }
+
+    public function renderEmail(array $settings, array $children, array $context, bool $decorate = false): ?string
+    {
+        // Email · nested table with inline styles only.
+        return '<table>...</table>';
+    }
+}
+```
+
+The three built-in layout blocks (`columns`, `columns-3`, `card`) already ship both renderers · the web view uses CSS grid + colour-mix, the email view emits nested tables.
 
 ### Marketing landing pages
 

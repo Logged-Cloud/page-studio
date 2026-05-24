@@ -142,4 +142,47 @@ class PageRenderer
         $kids = $children[$slot] ?? [];
         return is_array($kids) ? self::render($kids, $context, $decorate) : '';
     }
+
+    /**
+     * Email-safe variant of `render()` · prefers each block's
+     * `renderEmail()` override (typically nested `<table>` markup) and
+     * falls back to the regular `render()` when no override exists.
+     */
+    public static function renderForEmail(array $blocks, array $context = [], bool $decorate = false): string
+    {
+        $out = '';
+        foreach ($blocks as $block) {
+            $out .= self::renderBlockForEmail($block, $context, $decorate);
+        }
+        return $out;
+    }
+
+    public static function renderBlockForEmail(array $block, array $context = [], bool $decorate = false): string
+    {
+        $type = $block['type'] ?? null;
+        if (! $type) return '';
+        $class = \LoggedCloud\PageStudio\Blocks\BlockRegistry::find($type);
+        if (! $class) return '';
+
+        try {
+            /** @var \LoggedCloud\PageStudio\Blocks\BlockType $instance */
+            $instance = new $class();
+            $settings = $block['settings']        ?? [];
+            $children = is_array($block['children'] ?? null) ? $block['children'] : [];
+
+            $email = $instance->renderEmail($settings, $children, $context, $decorate);
+            if ($email !== null) return $email;
+
+            return $instance->render($settings, $children, $context, $decorate);
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    /** Email-aware sibling of `renderChildren()` for layout blocks' `renderEmail()`. */
+    public static function renderChildrenForEmail(array $children, string $slot, array $context, bool $decorate): string
+    {
+        $kids = $children[$slot] ?? [];
+        return is_array($kids) ? self::renderForEmail($kids, $context, $decorate) : '';
+    }
 }
