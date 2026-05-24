@@ -505,6 +505,8 @@ Tokens like `{{ user.email }}` survive intact so the renderer substitutes them a
 
 ### Custom blocks · developer-defined
 
+> **Step-by-step walkthrough:** [docs/tutorials/custom-blocks.md](docs/tutorials/custom-blocks.md) · build a Callout block end-to-end, including web / email / plain-text renders, slot recursion, variable substitution, and a Pest test.
+
 The page-builder's block palette uses the same code-defined pattern. Drop a class into `app/PageStudio/Blocks/` extending `LoggedCloud\PageStudio\Blocks\BlockType`:
 
 ```php
@@ -568,6 +570,8 @@ Built-in block types now ship as `BlockType` subclasses under `LoggedCloud\PageS
 ---
 
 ### Custom nodes · developer-defined
+
+> **Step-by-step walkthrough:** [docs/tutorials/custom-nodes.md](docs/tutorials/custom-nodes.md) · build a Greeting node, a source-only Current Season node, an HTTP-fetch Weather node, and a Pest test that runs the graph end-to-end.
 
 Drop a class into `app/PageStudio/Nodes/` that extends `LoggedCloud\PageStudio\Nodes\NodeType` and the package auto-registers it on boot · the class becomes a first-class palette type alongside the built-in sources / transforms / image / output nodes.
 
