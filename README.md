@@ -8,6 +8,39 @@ A Laravel package that turns "let users build pages and routes from a form" into
 
 Designed to drop into any Livewire 3+ Laravel app.
 
+> **Extending the studio?** Two step-by-step tutorials live under `docs/tutorials/`:
+> [Build a custom block](docs/tutorials/custom-blocks.md) · [Build a custom node](docs/tutorials/custom-nodes.md)
+
+---
+
+## Contents
+
+- [Screenshots](#screenshots)
+- [Install](#install)
+- [Quick start](#quick-start)
+- [Passing variables in](#passing-variables-in)
+- [Rendering a page without the route builder](#rendering-a-page-without-the-route-builder)
+- [Use cases beyond the obvious](#use-cases-beyond-the-obvious) · email · marketing landings · dashboards · documents · onboarding · knowledge base · A/B variants · SMS · status pages
+- [Route builder](#route-builder)
+- [Page builder](#page-builder)
+- [Node editor (Blender-style)](#node-editor-blender-style)
+- **Tutorials**
+  - [Custom blocks · developer-defined](docs/tutorials/custom-blocks.md)
+  - [Custom nodes · developer-defined](docs/tutorials/custom-nodes.md)
+- [Starter templates](#starter-templates)
+- [Importing existing HTML](#importing-existing-html)
+- [Custom blocks (in this README)](#custom-blocks--developer-defined)
+- [Custom nodes (in this README)](#custom-nodes--developer-defined)
+- [Variable types](#variable-types)
+- [Engine internals](#engine-internals)
+- [Theming](#theming)
+- [Events](#events)
+- [Permissions](#permissions)
+- [Model discovery](#model-discovery)
+- [Disabling parts of the editor](#disabling-parts-of-the-editor)
+- [Testing](#testing)
+- [License](#license)
+
 ---
 
 ## Screenshots
