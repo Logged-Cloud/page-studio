@@ -8,7 +8,10 @@ use Livewire\WithFileUploads;
 use LoggedCloud\PageStudio\Concerns\AuthorizesPageStudio;
 use LoggedCloud\PageStudio\Events\PageSaved;
 use LoggedCloud\PageStudio\Events\GraphSaved;
+use LoggedCloud\PageStudio\Models\Activity;
+use LoggedCloud\PageStudio\Models\BlockLock;
 use LoggedCloud\PageStudio\Models\Page;
+use LoggedCloud\PageStudio\Models\Presence;
 use LoggedCloud\PageStudio\Models\RouteDefinition;
 use LoggedCloud\PageStudio\Models\NodeGraph;
 use LoggedCloud\PageStudio\Support\BlockFactory;
@@ -325,7 +328,35 @@ class PageBuilder extends Component
 
     public function selectBlock(string $path): void
     {
-        $this->selectedPath = BlockTree::get($this->blocks, $path) ? $path : '';
+        $block = BlockTree::get($this->blocks, $path);
+        if (! $block) {
+            $this->selectedPath = '';
+            return;
+        }
+
+        // Release whatever block we had selected before · stops stale
+        // locks from accumulating when an author hops around the canvas.
+        if ($this->selectedPath !== '' && $this->selectedPath !== $path) {
+            $prev = BlockTree::get($this->blocks, $this->selectedPath);
+            if ($prev && ! empty($prev['id'])) {
+                $this->releaseBlockLock((string) $prev['id']);
+            }
+        }
+
+        // Try to claim the new block · if someone else holds it, leave
+        // selection cleared and let the JS-side toast surface the reason.
+        $blockId = (string) ($block['id'] ?? '');
+        if ($blockId !== '' && ! $this->acquireBlockLock($blockId)) {
+            $holder = $this->activeBlockLocks[$blockId]['name'] ?? 'someone else';
+            $this->dispatch('page-studio:lock:denied',
+                blockId: $blockId,
+                holder:  $holder,
+            );
+            $this->selectedPath = '';
+            return;
+        }
+
+        $this->selectedPath = $path;
     }
 
     public function clearSelection(): void
@@ -1275,7 +1306,30 @@ class PageBuilder extends Component
             publishedAt: $this->publishedAt,
         );
         if ($page) PageSaved::dispatch($page, auth()->user());
+
+        // Activity feed · record the save against whichever binding the
+        // editor mounted with. publish() / unpublish() route through here
+        // too, but they call recordPublishActivity() before dispatching
+        // save() so we skip the duplicate row in that case.
+        if ($page && ! $this->skipNextSaveActivity) {
+            [$authorId, $authorName] = $this->currentAuthor();
+            Activity::create([
+                'page_id'     => $page->id,
+                'route_id'    => $this->routeId,
+                'verb'        => 'saved',
+                'author_id'   => $authorId,
+                'author_name' => $authorName,
+            ]);
+        }
+        $this->skipNextSaveActivity = false;
     }
+
+    /**
+     * Internal flag · publish() / unpublish() set this before calling
+     * save() so the persisted row doesn't pick up a duplicate 'saved'
+     * activity row on top of its 'published' / 'unpublished' verb.
+     */
+    protected bool $skipNextSaveActivity = false;
 
     /**
      * Mark the page as published · stamps published_at to now and persists.
@@ -1284,7 +1338,23 @@ class PageBuilder extends Component
     {
         $this->status      = 'published';
         $this->publishedAt = now()->toIso8601String();
+
+        $this->skipNextSaveActivity = true;
         $this->save();
+
+        // Only record once the underlying save actually persisted · in
+        // ephemeral mode pageId stays null and the activity row would
+        // dangle without a target page.
+        if ($this->pageId !== null || $this->routeId !== null) {
+            [$authorId, $authorName] = $this->currentAuthor();
+            Activity::create([
+                'page_id'     => $this->pageId,
+                'route_id'    => $this->routeId,
+                'verb'        => 'published',
+                'author_id'   => $authorId,
+                'author_name' => $authorName,
+            ]);
+        }
     }
 
     /**
@@ -1294,7 +1364,337 @@ class PageBuilder extends Component
     public function unpublish(): void
     {
         $this->status = 'draft';
+        $this->skipNextSaveActivity = true;
         $this->save();
+
+        if ($this->pageId !== null || $this->routeId !== null) {
+            [$authorId, $authorName] = $this->currentAuthor();
+            Activity::create([
+                'page_id'     => $this->pageId,
+                'route_id'    => $this->routeId,
+                'verb'        => 'unpublished',
+                'author_id'   => $authorId,
+                'author_name' => $authorName,
+            ]);
+        }
+    }
+
+    /**
+     * Record a comment against a block · the comment payload itself
+     * is stored on the Activity row so we don't need a separate table
+     * for the polling-only feed. A future host can ship a richer
+     * Comment model that hangs off the same payload shape.
+     */
+    public function addComment(string $blockId, string $body, ?string $blockLabel = null): void
+    {
+        if ($this->pageId === null && $this->routeId === null) return;
+        $body = trim($body);
+        if ($body === '') return;
+
+        [$authorId, $authorName] = $this->currentAuthor();
+        Activity::create([
+            'page_id'     => $this->pageId,
+            'route_id'    => $this->routeId,
+            'verb'        => 'comment_added',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => array_filter([
+                'block_id'    => $blockId,
+                'block_label' => $blockLabel,
+                'body'        => $body,
+            ], fn ($v) => $v !== null && $v !== ''),
+        ]);
+    }
+
+    /**
+     * Mark a previously-added comment resolved · the resolver is the
+     * person clicking the tick, not necessarily the original commenter.
+     */
+    public function resolveComment(int $activityId): void
+    {
+        if ($this->pageId === null && $this->routeId === null) return;
+
+        $original = Activity::find($activityId);
+        if (! $original || $original->verb !== 'comment_added') return;
+
+        [$authorId, $authorName] = $this->currentAuthor();
+        Activity::create([
+            'page_id'     => $this->pageId,
+            'route_id'    => $this->routeId,
+            'verb'        => 'comment_resolved',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => array_filter([
+                'block_id'    => $original->payload['block_id']    ?? null,
+                'block_label' => $original->payload['block_label'] ?? null,
+                'resolved_id' => $activityId,
+            ], fn ($v) => $v !== null && $v !== ''),
+        ]);
+    }
+
+    // ─── Collaboration · block locks, presence, activity feed ───────────
+    //
+    // All three layers run polling-only (no Echo / Reverb) so the package
+    // stays runtime-light. A host app can swap broadcast in later · the
+    // call sites below already produce all the data a future channel needs.
+
+    /**
+     * Resolve the current author's [id, name] tuple · falls back to
+     * "Anonymous" when no host auth is available so the collaboration
+     * layer still records something useful in single-user / public-form
+     * scenarios.
+     *
+     * @return array{0:?int,1:string}
+     */
+    protected function currentAuthor(): array
+    {
+        $user = auth()->user();
+        if (! $user) return [null, 'Anonymous'];
+
+        $id   = $user->getKey();
+        // Best-effort name resolution · most Laravel User models expose
+        // `name`, but the Authenticatable contract only guarantees an
+        // identifier. Fall back to email, then to the id.
+        $name = $user->name
+            ?? $user->email
+            ?? ('User '.$id);
+        return [$id, (string) $name];
+    }
+
+    /**
+     * Try to claim the given block · returns false when another user
+     * already holds an active lock. Same-user re-acquires refresh the
+     * existing row's expiry rather than creating a duplicate.
+     */
+    public function acquireBlockLock(string $blockId): bool
+    {
+        // Ephemeral mode · no page binding, nothing to lock against.
+        // Silently succeed so callers don't need to special-case.
+        if ($this->pageId === null) return true;
+
+        [$authorId, $authorName] = $this->currentAuthor();
+
+        $existing = BlockLock::where('page_id', $this->pageId)
+            ->where('block_id', $blockId)
+            ->first();
+
+        if ($existing && $existing->expires_at && $existing->expires_at->isFuture()) {
+            // Someone else holds a live lock · refuse so the editor
+            // can fall back to read-only treatment.
+            if ($existing->author_id !== $authorId) {
+                return false;
+            }
+            // Same author re-acquiring · push the expiry forward, keep
+            // the original row so heartbeats stay coherent.
+            $existing->update([
+                'author_name' => $authorName,
+                'expires_at'  => now()->addSeconds(30),
+            ]);
+            return true;
+        }
+
+        // No active lock (or the row exists but expired) · take it.
+        BlockLock::updateOrCreate(
+            ['page_id' => $this->pageId, 'block_id' => $blockId],
+            [
+                'author_id'   => $authorId,
+                'author_name' => $authorName,
+                'expires_at'  => now()->addSeconds(30),
+            ],
+        );
+
+        // Record the take in the activity feed · noisy lock churn from
+        // refreshes is filtered out by the same-author branch above.
+        Activity::create([
+            'page_id'     => $this->pageId,
+            'route_id'    => $this->routeId,
+            'verb'        => 'lock_acquired',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => ['block_id' => $blockId],
+        ]);
+
+        return true;
+    }
+
+    /**
+     * Drop the lock on $blockId · only the holder can release. A no-op
+     * when the lock doesn't exist or belongs to someone else.
+     */
+    public function releaseBlockLock(string $blockId): void
+    {
+        if ($this->pageId === null) return;
+        [$authorId] = $this->currentAuthor();
+
+        BlockLock::where('page_id', $this->pageId)
+            ->where('block_id', $blockId)
+            ->where('author_id', $authorId)
+            ->delete();
+    }
+
+    /**
+     * Push the expiry forward on every lock the current user holds for
+     * the given block ids · called by the Alpine heartbeat every ~8s
+     * to stop locks ageing out while the editor is still open.
+     */
+    public function heartbeatBlockLocks(array $blockIds): void
+    {
+        if ($this->pageId === null || empty($blockIds)) return;
+        [$authorId] = $this->currentAuthor();
+
+        BlockLock::where('page_id', $this->pageId)
+            ->where('author_id', $authorId)
+            ->whereIn('block_id', $blockIds)
+            ->update(['expires_at' => now()->addSeconds(30)]);
+    }
+
+    /**
+     * Locks currently held by OTHER users on the bound page · the
+     * shape is keyed by block id so the block-editor template can do
+     * a quick lookup per render.
+     *
+     * @return array<string, array{name: string, expires_at: string}>
+     */
+    #[Computed]
+    public function activeBlockLocks(): array
+    {
+        if ($this->pageId === null) return [];
+
+        [$authorId] = $this->currentAuthor();
+
+        $rows = BlockLock::where('page_id', $this->pageId)
+            ->active()
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            // Skip the current user's own locks · the UI is meant to
+            // warn ABOUT other people, not the holder themselves.
+            if ($row->author_id !== null && $row->author_id === $authorId) continue;
+            // For anonymous holders (author_id null) on the same
+            // session, suppress too · same-tab self-locks shouldn't
+            // ribbon themselves.
+            $out[$row->block_id] = [
+                'name'       => (string) ($row->author_name ?: 'Someone'),
+                'expires_at' => $row->expires_at?->toIso8601String() ?? '',
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Upsert the current tab's presence row · driven by the same
+     * Alpine heartbeat that keeps block-lock expiries fresh.
+     */
+    public function heartbeatPresence(): void
+    {
+        if ($this->pageId === null) return;
+        [$authorId, $authorName] = $this->currentAuthor();
+
+        Presence::updateOrCreate(
+            ['page_id' => $this->pageId, 'session_id' => $this->presenceSessionId()],
+            [
+                'author_id'   => $authorId,
+                'author_name' => $authorName,
+                'seen_at'     => now(),
+            ],
+        );
+    }
+
+    /**
+     * Stable per-tab session handle · Livewire's component id is the
+     * natural fit during a real request, but falls back to a random
+     * 64-bit hex string during unit-test boot so the unique constraint
+     * doesn't trip on null. Cached on the instance so heartbeats stay
+     * on the same row across calls.
+     */
+    protected ?string $cachedSessionId = null;
+    protected function presenceSessionId(): string
+    {
+        if ($this->cachedSessionId !== null) return $this->cachedSessionId;
+        try {
+            $id = $this->getId();
+        } catch (\Throwable $_) {
+            $id = null;
+        }
+        return $this->cachedSessionId = (string) ($id ?: bin2hex(random_bytes(8)));
+    }
+
+    /**
+     * Other tabs currently viewing the bound page · excludes the
+     * current tab's own session and any row older than the TTL.
+     *
+     * @return array<int, array{name: string, last_seen: string}>
+     */
+    #[Computed]
+    public function activePeers(): array
+    {
+        if ($this->pageId === null) return [];
+
+        return Presence::where('page_id', $this->pageId)
+            ->where('session_id', '!=', $this->presenceSessionId())
+            ->active()
+            ->orderByDesc('seen_at')
+            ->get()
+            ->map(fn ($p) => [
+                'name'      => (string) ($p->author_name ?: 'Someone'),
+                'last_seen' => $p->seen_at?->toIso8601String() ?? '',
+            ])
+            ->all();
+    }
+
+    /**
+     * The last 30 activity rows for the bound page / route · formatted
+     * with a pre-baked human summary string so the rail-tab template
+     * stays dumb.
+     *
+     * @return array<int, array{verb:string,author_name:string,payload:array,created_at:string,summary:string}>
+     */
+    #[Computed]
+    public function activityFeed(): array
+    {
+        if ($this->pageId === null && $this->routeId === null) return [];
+
+        return Activity::forPage($this->pageId, $this->routeId)
+            ->recent(30)
+            ->get()
+            ->map(function (Activity $a) {
+                $name    = (string) ($a->author_name ?: 'Someone');
+                $payload = (array) ($a->payload ?? []);
+                return [
+                    'verb'        => $a->verb,
+                    'author_name' => $name,
+                    'payload'     => $payload,
+                    'created_at'  => $a->created_at?->toIso8601String() ?? '',
+                    'summary'     => $this->summariseActivity($a->verb, $name, $payload),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * Render a single activity row as a human-readable one-liner ·
+     * shared by the rail-tab template and the (eventual) notification
+     * hooks so phrasing stays consistent across surfaces.
+     */
+    protected function summariseActivity(string $verb, string $name, array $payload): string
+    {
+        $blockLabel = function (array $payload): string {
+            $id = $payload['block_id'] ?? null;
+            if (! $id) return 'a block';
+            $label = $payload['block_label'] ?? null;
+            return $label ? (string) $label : 'a block';
+        };
+
+        return match ($verb) {
+            'saved'             => $name.' saved the page',
+            'published'         => $name.' published',
+            'unpublished'       => $name.' moved the page back to draft',
+            'comment_added'     => $name.' commented on '.$blockLabel($payload),
+            'comment_resolved'  => $name.' resolved a comment on '.$blockLabel($payload),
+            'lock_acquired'     => $name.' started editing '.$blockLabel($payload),
+            default             => $name.' '.$verb,
+        };
     }
 
     #[Computed]
