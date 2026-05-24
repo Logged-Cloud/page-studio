@@ -328,6 +328,119 @@ class PageBuilder extends Component
     }
 
     /**
+     * Duplicate the block at $path · inserts a deep clone (with a fresh id
+     * tree) at index + 1 inside the same parent + slot. Pushes a history
+     * snapshot first so undo restores the pre-duplication tree.
+     */
+    public function duplicateBlock(string $path): void
+    {
+        $original = BlockTree::get($this->blocks, $path);
+        if (! $original) return;
+
+        $this->pushHistory();
+
+        [$parentPath, $slot, $index] = $this->splitLastPath($path);
+        $clone = $this->cloneBlockWithFreshIds($original);
+        $this->blocks = BlockTree::insert($this->blocks, $parentPath, $slot, $index + 1, $clone);
+        $this->selectedPath = $this->pathFor($parentPath, $slot, $index + 1);
+    }
+
+    /**
+     * Walk every block in the tree and apply $find -> $replace across each
+     * string-valued setting. Returns the count of blocks where at least one
+     * setting changed (the UI surfaces this as "N matches replaced").
+     *
+     * In regex mode bad patterns are swallowed (the @ on preg_replace plus a
+     * null-result bailout) so an in-progress pattern never blows up the editor.
+     */
+    public function searchAndReplace(string $find, string $replace, bool $regex = false): int
+    {
+        if ($find === '') return 0;
+
+        $changedBlocks = 0;
+        $apply = function (array $block) use ($find, $replace, $regex, &$apply, &$changedBlocks): array {
+            $touched = false;
+            foreach ($block['settings'] ?? [] as $key => $value) {
+                if (! is_string($value)) continue;
+                if ($regex) {
+                    $next = @preg_replace($find, $replace, $value);
+                    if ($next === null) return $block;
+                } else {
+                    $next = str_replace($find, $replace, $value);
+                }
+                if ($next !== $value) {
+                    $block['settings'][$key] = $next;
+                    $touched = true;
+                }
+            }
+            if ($touched) $changedBlocks++;
+
+            if (! empty($block['children']) && is_array($block['children'])) {
+                foreach ($block['children'] as $slot => $kids) {
+                    if (! is_array($kids)) continue;
+                    foreach ($kids as $i => $kid) {
+                        $block['children'][$slot][$i] = $apply($kid);
+                    }
+                }
+            }
+            return $block;
+        };
+
+        // Pre-flight bad-regex check · if even one block's apply bails out
+        // because the pattern is invalid, we want zero mutations on the tree.
+        if ($regex) {
+            $probe = @preg_replace($find, $replace, '');
+            if ($probe === null) return 0;
+        }
+
+        $this->pushHistory();
+        $next = [];
+        foreach ($this->blocks as $b) {
+            $next[] = $apply($b);
+        }
+        $this->blocks = $next;
+
+        // If nothing changed, pop the history snapshot we just pushed so a
+        // no-op replace doesn't burn an undo step.
+        if ($changedBlocks === 0) {
+            array_pop($this->undoStack);
+        }
+
+        return $changedBlocks;
+    }
+
+    /**
+     * Deep clone a block subtree assigning every block (and every nested
+     * child) a fresh id · prevents wire:key collisions in the editor.
+     */
+    protected function cloneBlockWithFreshIds(array $block): array
+    {
+        $block['id'] = bin2hex(random_bytes(6));
+        if (! empty($block['children']) && is_array($block['children'])) {
+            foreach ($block['children'] as $slot => $kids) {
+                if (! is_array($kids)) continue;
+                foreach ($kids as $i => $kid) {
+                    $block['children'][$slot][$i] = $this->cloneBlockWithFreshIds($kid);
+                }
+            }
+        }
+        return $block;
+    }
+
+    /**
+     * Same split-last-segment helper BlockTree uses internally · the
+     * protected version isn't reachable from here so we re-derive it.
+     */
+    protected function splitLastPath(string $path): array
+    {
+        $bits = array_values(array_filter(explode('/', $path), fn ($b) => $b !== ''));
+        $lastIndex = (int) array_pop($bits);
+        $lastSlot  = $bits ? array_pop($bits) : null;
+        $parent    = implode('/', $bits);
+        return [$parent, $lastSlot, $lastIndex];
+    }
+
+    /**
      * Move a block · either reorder within its parent or change parent + slot.
      */
     public function moveBlock(string $fromPath, string $toParentPath = '', ?string $toSlot = null, ?int $toIndex = null): void
@@ -783,6 +896,33 @@ class PageBuilder extends Component
         ];
     }
 
+    /**
+     * Live "dirty diff" stamp · compares the current in-memory state to the
+     * most recent persisted revision. Returns zeros when no revision exists
+     * yet (e.g. before the first save) so the topbar can simply check
+     * if (any non-zero) → render.
+     *
+     * @return array{blocks:int,nodes:int,edges:int}
+     */
+    #[Computed]
+    public function latestRevisionDiff(): array
+    {
+        if ($this->routeId === null) {
+            return ['blocks' => 0, 'nodes' => 0, 'edges' => 0];
+        }
+        $latest = \LoggedCloud\PageStudio\Models\Revision::where('route_id', $this->routeId)
+            ->orderByDesc('id')
+            ->first();
+        if (! $latest) {
+            return ['blocks' => 0, 'nodes' => 0, 'edges' => 0];
+        }
+        return [
+            'blocks' => count($this->blocks) - count((array) $latest->blocks),
+            'nodes'  => count($this->nodes)  - count((array) $latest->nodes),
+            'edges'  => count($this->edges)  - count((array) $latest->edges),
+        ];
+    }
+
     #[Computed]
     public function revisions(): array
     {
@@ -1055,6 +1195,44 @@ class PageBuilder extends Component
             if ($node['id'] === $this->selectedNodeId) return "nodes.$i.settings.";
         }
         return '';
+    }
+
+    /**
+     * Flat list of every layout block currently on the page · the right-click
+     * "Move into..." submenu uses this to offer the available drop targets.
+     * Returns one entry per (block, slot) pair so the caller can pass the
+     * exact slot to moveBlock().
+     *
+     * @return array<int, array{path:string, slot:string, label:string}>
+     */
+    #[Computed]
+    public function layoutTargets(): array
+    {
+        $out = [];
+        $walk = function (array $list, string $path) use (&$walk, &$out) {
+            foreach ($list as $i => $block) {
+                $p      = $path === '' ? (string) $i : $path.'/'.$i;
+                $schema = config('page-studio.blocks.'.($block['type'] ?? ''), []);
+                if (! empty($schema['slots'])) {
+                    foreach ($schema['slots'] as $slot => $slotLabel) {
+                        $slotLabelStr = is_array($slotLabel) ? ($slotLabel['label'] ?? $slot) : $slotLabel;
+                        $out[] = [
+                            'path'  => $p,
+                            'slot'  => $slot,
+                            'label' => ($schema['label'] ?? $block['type']).' · '.$slotLabelStr,
+                        ];
+                    }
+                }
+                if (! empty($block['children']) && is_array($block['children'])) {
+                    foreach ($block['children'] as $slot => $kids) {
+                        if (! is_array($kids)) continue;
+                        $walk($kids, $p.'/'.$slot);
+                    }
+                }
+            }
+        };
+        $walk($this->blocks, '');
+        return $out;
     }
 
     #[Computed]

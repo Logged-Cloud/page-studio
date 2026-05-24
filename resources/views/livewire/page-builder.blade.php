@@ -3,6 +3,7 @@
     @page-studio:page:saved.window="showToast('Page saved', true)"
     @page-studio:graph:saved.window="showToast('Graph autosaved', true)"
     @page-studio:graph:copied.window="showToast('Copied ' + ($event.detail.count || 0) + ' nodes', true)"
+    @page-studio:replace:done.window="showToast(($event.detail.count || 0) + ' blocks updated', true)"
     class="ps-page-builder"
     data-component="page-studio.page-builder"
 >
@@ -41,6 +42,23 @@
                       "
                       x-text="rel"
                       :title="new Date('{{ $lastSavedAt }}').toLocaleString()"></span>
+            @endif
+
+            {{-- Live "dirty diff" stamp · how far the current state has
+                 drifted from the most recent revision. Hidden when clean. --}}
+            @php $lrd = $this->latestRevisionDiff; @endphp
+            @if ($lrd['blocks'] !== 0 || $lrd['nodes'] !== 0 || $lrd['edges'] !== 0)
+                <span class="ps-pb-diff-stamp"
+                      title="Unsaved changes since the last revision">
+                    @php
+                        $parts = [];
+                        foreach (['blocks' => 'blocks', 'nodes' => 'nodes', 'edges' => 'edges'] as $k => $label) {
+                            if ($lrd[$k] === 0) continue;
+                            $parts[] = ($lrd[$k] > 0 ? '+' : '').$lrd[$k].' '.$label;
+                        }
+                    @endphp
+                    {{ implode(', ', $parts) }}
+                </span>
             @endif
 
             <button type="button"
@@ -370,6 +388,55 @@
         </div>
     </div>
 
+    {{-- Block-tree search and replace · Ctrl-H opens a modal that fires
+         searchAndReplace() across every string-valued block setting. --}}
+    <div x-data="pageStudioReplacer()"
+         x-show="open"
+         x-cloak
+         @keydown.window.ctrl.h.prevent="open = true; $nextTick(() => $refs.find.focus())"
+         @keydown.window.meta.h.prevent="open = true; $nextTick(() => $refs.find.focus())"
+         @keydown.escape.window="open = false"
+         class="ps-pb-find-wrap">
+        <div class="ps-pb-find-backdrop" @click="open = false"></div>
+        <div class="ps-pb-find" role="dialog" aria-label="Search and replace">
+            <div class="ps-pb-replace-row">
+                <label class="ps-pb-replace-field">
+                    <span>Find</span>
+                    <input type="text"
+                           x-ref="find"
+                           x-model="find"
+                           placeholder="Text to find..."
+                           @keydown.enter.prevent="run()">
+                </label>
+                <label class="ps-pb-replace-field">
+                    <span>Replace with</span>
+                    <input type="text"
+                           x-model="replace"
+                           placeholder="Replacement..."
+                           @keydown.enter.prevent="run()">
+                </label>
+            </div>
+            <div class="ps-pb-replace-controls">
+                <label class="ps-pb-checkbox">
+                    <input type="checkbox" x-model="regex">
+                    <span>Regular expression (use full <code>/pattern/flags</code>)</span>
+                </label>
+                <div class="ps-pb-replace-actions">
+                    <button type="button"
+                            class="ps-pb-btn"
+                            @click="open = false">Cancel</button>
+                    <button type="button"
+                            class="ps-pb-btn ps-pb-btn--primary"
+                            :disabled="busy || ! find"
+                            @click="run()">Replace all</button>
+                </div>
+            </div>
+            <p class="ps-pb-find-hint" x-show="! find">
+                Ctrl-H · type a string to find, leave Replace blank to delete matches.
+            </p>
+        </div>
+    </div>
+
     {{-- Hot-key cheat sheet · ? opens, Esc / outside-click closes --}}
     <div x-data="{ open: false }"
          x-show="open"
@@ -383,6 +450,8 @@
             <table>
                 <tr><th>?</th><td>This menu</td></tr>
                 <tr><th>Ctrl-F · /</th><td>Find blocks + nodes</td></tr>
+                <tr><th>Ctrl-H</th><td>Replace text across the page</td></tr>
+                <tr><th>Right-click block</th><td>Block context menu</td></tr>
                 <tr><th>Ctrl-Z / Ctrl-Shift-Z</th><td>Undo / redo</td></tr>
                 <tr><th>Ctrl-D</th><td>Duplicate selected node</td></tr>
                 <tr><th>Ctrl-C / Ctrl-V</th><td>Copy / paste a subgraph</td></tr>
@@ -909,6 +978,46 @@
         @endif
     </div>
 
+    {{-- Right-click context menu on a block wrap · Duplicate, Move into,
+         Remove. Mirrors the node-canvas ctxMenu pattern but anchored to
+         the block tree. --}}
+    <div x-show="blockCtx.open"
+         x-cloak
+         :style="`top:${blockCtx.y}px;left:${blockCtx.x}px`"
+         @click.outside="closeBlockCtxMenu()"
+         @keydown.escape.window="closeBlockCtxMenu()"
+         class="ps-pb-block-ctx-menu"
+         role="menu">
+        <button type="button" class="ps-pb-block-ctx-item"
+                @click.stop="duplicateHere()"
+                role="menuitem">
+            <span class="ps-pb-block-ctx-icon">⎘</span>
+            <span>Duplicate</span>
+        </button>
+
+        @php $layoutTargets = $this->layoutTargets; @endphp
+        @if (! empty($layoutTargets))
+            <div class="ps-pb-block-ctx-section">Move into</div>
+            @foreach ($layoutTargets as $t)
+                <button type="button" class="ps-pb-block-ctx-item"
+                        @click.stop="moveInto(@js($t['path']), @js($t['slot']))"
+                        role="menuitem"
+                        x-show="blockCtx.path !== @js($t['path']) && ! (blockCtx.path || '').startsWith(@js($t['path'] . '/'))">
+                    <span class="ps-pb-block-ctx-icon">▢</span>
+                    <span>{{ $t['label'] }}</span>
+                </button>
+            @endforeach
+        @endif
+
+        <div class="ps-pb-block-ctx-section">Danger</div>
+        <button type="button" class="ps-pb-block-ctx-item ps-pb-block-ctx-danger"
+                @click.stop="removeHere()"
+                role="menuitem">
+            <span class="ps-pb-block-ctx-icon">✕</span>
+            <span>Remove</span>
+        </button>
+    </div>
+
     {{-- Always-on toast container · fixed-positioned so it's never clipped --}}
     <div
         x-show="toast.show"
@@ -993,6 +1102,34 @@
                             this.open = false;
                             this.query = '';
                             this.cursor = 0;
+                        },
+                    };
+                };
+
+                // Search and replace · Ctrl-H opens a modal that pipes
+                // (find, replace, regex) into the server-side replacer and
+                // surfaces the resulting match count as a toast.
+                window.pageStudioReplacer = function () {
+                    return {
+                        open: false,
+                        find: '',
+                        replace: '',
+                        regex: false,
+                        busy: false,
+
+                        async run() {
+                            if (! this.find || this.busy) return;
+                            this.busy = true;
+                            try {
+                                const count = await this.$wire.searchAndReplace(this.find, this.replace, this.regex);
+                                // Bounce a toast via the global builder scope.
+                                window.dispatchEvent(new CustomEvent('page-studio:replace:done', {
+                                    detail: { count: Number(count) || 0 },
+                                }));
+                                this.open = false;
+                            } finally {
+                                this.busy = false;
+                            }
                         },
                     };
                 };
@@ -1117,6 +1254,9 @@
                         // Stores the target field + its caret position at click
                         // time so we know exactly where to splice the token.
                         varPicker: { open: false, x: 0, y: 0, targetEl: null, start: 0, end: 0, wireProp: null },
+                        // Right-click block context menu · path is the block
+                        // the user invoked the menu over.
+                        blockCtx: { open: false, x: 0, y: 0, path: '' },
                         toast: { show: false, ok: true, message: '' },
                         toastTimer: null,
 
@@ -1372,6 +1512,37 @@
                                 if (a.name.startsWith('wire:model')) return a.value;
                             }
                             return null;
+                        },
+
+                        // ─── Right-click block context menu ─────────────────
+                        openBlockCtxMenu(e, path) {
+                            // Position viewport-local so it isn't clipped by any
+                            // scrolling parent inside the canvas.
+                            this.blockCtx = {
+                                open: true,
+                                x: e.clientX,
+                                y: e.clientY,
+                                path,
+                            };
+                        },
+
+                        closeBlockCtxMenu() {
+                            this.blockCtx.open = false;
+                        },
+
+                        duplicateHere() {
+                            this.$wire.duplicateBlock(this.blockCtx.path);
+                            this.closeBlockCtxMenu();
+                        },
+
+                        removeHere() {
+                            this.$wire.removeBlock(this.blockCtx.path);
+                            this.closeBlockCtxMenu();
+                        },
+
+                        moveInto(toBlockPath, toSlot) {
+                            this.$wire.moveBlock(this.blockCtx.path, toBlockPath, toSlot, 0);
+                            this.closeBlockCtxMenu();
                         },
                     };
                 };
@@ -2051,6 +2222,17 @@
                     font-variant-numeric: tabular-nums;
                     margin-right: .15rem;
                     white-space: nowrap;
+                }
+                .ps-pb-diff-stamp {
+                    font-size: .68rem;
+                    color: var(--accent, #2C66E8);
+                    font-variant-numeric: tabular-nums;
+                    background: rgba(44,102,232,.10);
+                    border: 1px solid rgba(44,102,232,.30);
+                    padding: .1rem .4rem;
+                    border-radius: .3rem;
+                    white-space: nowrap;
+                    margin-right: .15rem;
                 }
                 .ps-pb-rail-toggle {
                     background: transparent;
@@ -3272,6 +3454,92 @@
                     margin-left: auto;
                 }
                 .ps-ne-ctx-icon { width: 1rem; text-align: center; }
+
+                /* Block-tree right-click context menu · fixed positioning
+                   so the menu sits above any scrolling canvas frame. */
+                .ps-pb-block-ctx-menu {
+                    position: fixed;
+                    z-index: 80;
+                    min-width: 14rem;
+                    max-width: 20rem;
+                    max-height: 24rem;
+                    overflow-y: auto;
+                    background: var(--surface-2, #1E1F22);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .35rem;
+                    box-shadow: 0 10px 28px rgba(0,0,0,.5);
+                    padding: .2rem;
+                }
+                .ps-pb-block-ctx-section {
+                    font-size: .6rem;
+                    text-transform: uppercase;
+                    letter-spacing: .07em;
+                    color: var(--ink-dim, #A3A099);
+                    padding: .45rem .55rem .2rem;
+                }
+                .ps-pb-block-ctx-item {
+                    display: flex;
+                    align-items: center;
+                    gap: .45rem;
+                    width: 100%;
+                    background: transparent;
+                    border: 0;
+                    color: var(--ink, #F0EDE5);
+                    text-align: left;
+                    padding: .3rem .55rem;
+                    border-radius: .25rem;
+                    font: inherit;
+                    font-size: .8rem;
+                    cursor: pointer;
+                }
+                .ps-pb-block-ctx-item:hover {
+                    background: color-mix(in srgb, var(--accent, #2C66E8) 18%, transparent);
+                }
+                .ps-pb-block-ctx-icon { width: 1rem; text-align: center; }
+                .ps-pb-block-ctx-danger { color: #F87171; }
+                .ps-pb-block-ctx-danger:hover {
+                    background: rgba(248,113,113,.16);
+                }
+
+                /* Search-and-replace overlay · uses the finder shell with
+                   side-by-side find / replace fields. */
+                .ps-pb-replace-row {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr;
+                    gap: .6rem;
+                    padding: .6rem;
+                }
+                .ps-pb-replace-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: .25rem;
+                }
+                .ps-pb-replace-field span {
+                    font-size: .65rem;
+                    text-transform: uppercase;
+                    letter-spacing: .07em;
+                    color: var(--ink-dim, #A3A099);
+                }
+                .ps-pb-replace-field input {
+                    background: var(--surface, #141518);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .3rem;
+                    color: var(--ink, #F0EDE5);
+                    padding: .35rem .5rem;
+                    font: inherit;
+                    font-size: .85rem;
+                }
+                .ps-pb-replace-controls {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    padding: 0 .6rem .6rem;
+                    gap: .6rem;
+                }
+                .ps-pb-replace-actions {
+                    display: flex;
+                    gap: .4rem;
+                }
 
                 .ps-ne-settings {
                     overflow-y: auto;
