@@ -1439,11 +1439,12 @@ class PageBuilder extends Component
     {
         // Ephemeral mode · no page binding, nothing to lock against.
         // Silently succeed so callers don't need to special-case.
-        if ($this->pageId === null) return true;
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return true;
 
         [$authorId, $authorName] = $this->currentAuthor();
 
-        $existing = BlockLock::where('page_id', $this->pageId)
+        $existing = BlockLock::where('page_id', $pageId)
             ->where('block_id', $blockId)
             ->first();
 
@@ -1464,7 +1465,7 @@ class PageBuilder extends Component
 
         // No active lock (or the row exists but expired) · take it.
         BlockLock::updateOrCreate(
-            ['page_id' => $this->pageId, 'block_id' => $blockId],
+            ['page_id' => $pageId, 'block_id' => $blockId],
             [
                 'author_id'   => $authorId,
                 'author_name' => $authorName,
@@ -1475,7 +1476,7 @@ class PageBuilder extends Component
         // Record the take in the activity feed · noisy lock churn from
         // refreshes is filtered out by the same-author branch above.
         Activity::create([
-            'page_id'     => $this->pageId,
+            'page_id'     => $pageId,
             'route_id'    => $this->routeId,
             'verb'        => 'lock_acquired',
             'author_id'   => $authorId,
@@ -1492,10 +1493,11 @@ class PageBuilder extends Component
      */
     public function releaseBlockLock(string $blockId): void
     {
-        if ($this->pageId === null) return;
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return;
         [$authorId] = $this->currentAuthor();
 
-        BlockLock::where('page_id', $this->pageId)
+        BlockLock::where('page_id', $pageId)
             ->where('block_id', $blockId)
             ->where('author_id', $authorId)
             ->delete();
@@ -1508,10 +1510,11 @@ class PageBuilder extends Component
      */
     public function heartbeatBlockLocks(array $blockIds): void
     {
-        if ($this->pageId === null || empty($blockIds)) return;
+        $pageId = $this->resolvePageId();
+        if ($pageId === null || empty($blockIds)) return;
         [$authorId] = $this->currentAuthor();
 
-        BlockLock::where('page_id', $this->pageId)
+        BlockLock::where('page_id', $pageId)
             ->where('author_id', $authorId)
             ->whereIn('block_id', $blockIds)
             ->update(['expires_at' => now()->addSeconds(30)]);
@@ -1527,11 +1530,12 @@ class PageBuilder extends Component
     #[Computed]
     public function activeBlockLocks(): array
     {
-        if ($this->pageId === null) return [];
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return [];
 
         [$authorId] = $this->currentAuthor();
 
-        $rows = BlockLock::where('page_id', $this->pageId)
+        $rows = BlockLock::where('page_id', $pageId)
             ->active()
             ->get();
 
@@ -1557,11 +1561,12 @@ class PageBuilder extends Component
      */
     public function heartbeatPresence(): void
     {
-        if ($this->pageId === null) return;
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return;
         [$authorId, $authorName] = $this->currentAuthor();
 
         Presence::updateOrCreate(
-            ['page_id' => $this->pageId, 'session_id' => $this->presenceSessionId()],
+            ['page_id' => $pageId, 'session_id' => $this->presenceSessionId()],
             [
                 'author_id'   => $authorId,
                 'author_name' => $authorName,
@@ -1598,9 +1603,10 @@ class PageBuilder extends Component
     #[Computed]
     public function activePeers(): array
     {
-        if ($this->pageId === null) return [];
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return [];
 
-        return Presence::where('page_id', $this->pageId)
+        return Presence::where('page_id', $pageId)
             ->where('session_id', '!=', $this->presenceSessionId())
             ->active()
             ->orderByDesc('seen_at')
@@ -2015,6 +2021,19 @@ class PageBuilder extends Component
      * pageId and no routeId), which the comment methods treat as
      * "comments unavailable".
      */
+    /**
+     * Resolve the page id without creating a Page row. Used by collab
+     * computed methods that should silently no-op when the route hasn't
+     * been authored against yet, rather than spawning an empty Page.
+     */
+    protected function resolvePageId(): ?int
+    {
+        if ($this->pageId !== null) return $this->pageId;
+        if ($this->routeId === null) return null;
+        $existing = Page::where('route_id', $this->routeId)->value('id');
+        return $existing !== null ? (int) $existing : null;
+    }
+
     protected function bindablePageId(): ?int
     {
         if ($this->pageId !== null) return $this->pageId;
