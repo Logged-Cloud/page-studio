@@ -111,6 +111,7 @@ class PageStudioServiceProvider extends ServiceProvider
             Nodes\Builtin\SourceRequestNode::class,
             Nodes\Builtin\SourceNowNode::class,
             Nodes\Builtin\SourceModelFinderNode::class,
+            Nodes\Builtin\SourceHttpFetchNode::class,
             // Text + value transforms
             Nodes\Builtin\TransformUppercaseNode::class,
             Nodes\Builtin\TransformLowercaseNode::class,
@@ -128,6 +129,10 @@ class PageStudioServiceProvider extends ServiceProvider
             Nodes\Builtin\TransformIfNode::class,
             Nodes\Builtin\TransformFirstNode::class,
             Nodes\Builtin\TransformMathNode::class,
+            Nodes\Builtin\TransformLoopMapNode::class,
+            Nodes\Builtin\TransformSwitchCaseNode::class,
+            Nodes\Builtin\TransformCurrencyFormatNode::class,
+            Nodes\Builtin\TransformNumberFormatNode::class,
             // Convert
             Nodes\Builtin\ConvertToStringNode::class,
             Nodes\Builtin\ConvertToIntNode::class,
