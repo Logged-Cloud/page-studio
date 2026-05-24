@@ -943,7 +943,7 @@
                                             wire:click.stop="toggleMuted(@js($node['id']))"
                                             title="Mute node · input passes straight through to output">M</button>
                                 @endif
-                                @if (($node['type'] ?? '') === 'source.model_finder')
+                                @if (in_array($node['type'] ?? '', ['source.model_finder', 'source.auth_user'], true))
                                     <button type="button"
                                             class="ps-ne-node-action{{ ! empty($node['settings']['expose_fields']) ? ' is-on' : '' }}"
                                             wire:click.stop="toggleModelFields(@js($node['id']))"

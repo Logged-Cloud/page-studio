@@ -16,6 +16,13 @@ class ModelFieldsTestWidget extends Model
     public $timestamps = false;
 }
 
+class ModelFieldsTestAuthUser extends \Illuminate\Foundation\Auth\User
+{
+    protected $table = 'mf_widgets';
+    protected $guarded = [];
+    public $timestamps = false;
+}
+
 beforeEach(function () {
     ModelFields::flush();
     Schema::dropIfExists('mf_widgets');
@@ -115,4 +122,75 @@ it('toggleModelFields flips the per-node flag', function () {
 
     $pb->toggleModelFields('n1');
     expect($pb->nodes[0]['settings']['expose_fields'])->toBeFalse();
+});
+
+it('outputsFor expands source.auth_user outputs from the configured user model', function () {
+    config()->set('auth.providers.users.model', ModelFieldsTestWidget::class);
+    ModelFields::flush();
+
+    $pb = new PageBuilder();
+    $outputs = $pb->outputsFor([
+        'id'   => 'au',
+        'type' => 'source.auth_user',
+        'settings' => ['expose_fields' => true],
+    ]);
+
+    expect(array_keys($outputs))->toEqual(['id', 'name', 'qty', 'active', 'meta'])
+        ->and($outputs['name']['type'])->toBe('string');
+});
+
+it('outputsFor leaves source.auth_user on the static schema when expose_fields is off', function () {
+    config()->set('auth.providers.users.model', ModelFieldsTestWidget::class);
+
+    $pb = new PageBuilder();
+    $outputs = $pb->outputsFor([
+        'id'   => 'au',
+        'type' => 'source.auth_user',
+        'settings' => [],
+    ]);
+
+    expect($outputs)->toHaveKey('user')
+        ->and($outputs)->not->toHaveKey('name');
+});
+
+it('source.auth_user evaluator emits one entry per attribute when expose_fields is on', function () {
+    $user = new ModelFieldsTestAuthUser();
+    $user->forceFill(['id' => 5, 'name' => 'Alice']);
+    $user->exists = true;
+    auth()->setUser($user);
+
+    $node = new \LoggedCloud\PageStudio\Nodes\Builtin\SourceAuthUserNode();
+    $out  = $node->evaluate([], ['expose_fields' => true], []);
+
+    expect($out)->toHaveKey('id')
+        ->and($out['id'])->toBe(5)
+        ->and($out['name'])->toBe('Alice')
+        ->and($out)->not->toHaveKey('user');
+});
+
+it('source.auth_user evaluator falls back to the single-user output when expose_fields is off', function () {
+    $user = new ModelFieldsTestAuthUser();
+    $user->forceFill(['id' => 5, 'name' => 'Alice']);
+    auth()->setUser($user);
+
+    $node = new \LoggedCloud\PageStudio\Nodes\Builtin\SourceAuthUserNode();
+    $out  = $node->evaluate([], [], []);
+
+    expect($out)->toHaveKey('user')
+        ->and($out['user'])->toBe($user);
+});
+
+it('toggleModelFields also flips the flag on source.auth_user nodes', function () {
+    $route = \LoggedCloud\PageStudio\Models\RouteDefinition::create([
+        'name' => 'tau', 'path_template' => '/tau', 'method' => 'get',
+    ]);
+    $pb = new PageBuilder();
+    $pb->mount($route->id);
+    $pb->nodes = [[
+        'id' => 'au', 'type' => 'source.auth_user', 'position' => ['x' => 0, 'y' => 0],
+        'settings' => ['expose_fields' => false],
+    ]];
+
+    $pb->toggleModelFields('au');
+    expect($pb->nodes[0]['settings']['expose_fields'])->toBeTrue();
 });
