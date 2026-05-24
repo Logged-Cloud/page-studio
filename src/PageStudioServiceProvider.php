@@ -178,6 +178,9 @@ class PageStudioServiceProvider extends ServiceProvider
             Blocks\Builtin\SpacerBlock::class,
             Blocks\Builtin\SignatureBlock::class,
             Blocks\Builtin\SocialBlock::class,
+            Blocks\Builtin\EmbedBlock::class,
+            Blocks\Builtin\VideoBlock::class,
+            Blocks\Builtin\AccordionBlock::class,
             // Layout
             Blocks\Builtin\HeroBlock::class,
             Blocks\Builtin\SectionBlock::class,
@@ -186,6 +189,7 @@ class PageStudioServiceProvider extends ServiceProvider
             Blocks\Builtin\CardBlock::class,
             Blocks\Builtin\ConditionalBlock::class,
             Blocks\Builtin\PanelBlock::class,
+            Blocks\Builtin\TabsBlock::class,
         ];
         foreach ($builtins as $class) {
             try {
