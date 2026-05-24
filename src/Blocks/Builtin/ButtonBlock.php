@@ -44,6 +44,35 @@ class ButtonBlock extends BlockType
         );
     }
 
+    public function renderEmail(array $settings, array $children, array $context, bool $decorate = false): ?string
+    {
+        // Outlook is the only major client that mangles inline-block anchors ·
+        // wrap in a single-cell table so the touch target is honoured everywhere.
+        $variant = (string) ($settings['variant'] ?? 'primary');
+        $href    = htmlspecialchars(
+            PageRenderer::substitute((string) ($settings['href'] ?? '#'), $context, false),
+            ENT_QUOTES | ENT_HTML5, 'UTF-8',
+        );
+        $label = PageRenderer::renderText((string) ($settings['label'] ?? ''), $context, false);
+
+        [$bg, $fg, $border] = match ($variant) {
+            'secondary' => ['#ffffff', '#1a1a1a', '#d0d5dd'],
+            'ghost'     => ['#ffffff', '#2C66E8', '#ffffff'],
+            default     => ['#2C66E8', '#ffffff', '#2C66E8'],
+        };
+
+        return sprintf(
+            '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0;border-collapse:collapse">'
+                .'<tr>'
+                    .'<td bgcolor="%1$s" style="background:%1$s;border:1px solid %3$s;border-radius:4px">'
+                        .'<a href="%4$s" style="display:inline-block;padding:10px 18px;color:%2$s;text-decoration:none;font-weight:600;font-family:-apple-system,system-ui,sans-serif">%5$s</a>'
+                    .'</td>'
+                .'</tr>'
+            .'</table>',
+            $bg, $fg, $border, $href, $label,
+        );
+    }
+
     public function renderText(array $settings, array $children, array $context): ?string
     {
         $label = PageRenderer::substitute((string) ($settings['label'] ?? ''), $context);
