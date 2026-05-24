@@ -89,6 +89,16 @@ class PageBuilder extends Component
     public ?string $lastSavedAt = null;
 
     /**
+     * Lifecycle state · 'draft' or 'published'. Drafts are hidden from the
+     * auto-registered Studio routes; published pages render normally. A
+     * non-null `publishAt` in the future keeps the page invisible until
+     * then (treated as a "scheduled" sub-state in the UI).
+     */
+    public string $status = 'draft';
+    public ?string $publishAt = null;
+    public ?string $publishedAt = null;
+
+    /**
      * Node-graph state · the variable-composition layer that lives in the
      * bottom drawer. Persisted in its own table (page_studio_node_graphs).
      *
@@ -179,6 +189,11 @@ class PageBuilder extends Component
             $page ? (array) ($page->meta ?? []) : [],
         );
         $this->lastSavedAt = $page?->updated_at?->toIso8601String();
+        $this->status      = (string) ($page?->status ?? 'draft');
+        // HTML datetime-local inputs want `YYYY-MM-DDTHH:MM` · the trailing
+        // seconds confuse some browsers, so trim to minute precision.
+        $this->publishAt   = $page?->publish_at?->format('Y-m-d\TH:i');
+        $this->publishedAt = $page?->published_at?->toIso8601String();
 
         $graph = $routeId !== null ? NodeGraph::where('route_id', $routeId)->first() : null;
         $this->nodes = $graph ? (array) $graph->nodes : [];
@@ -939,6 +954,121 @@ class PageBuilder extends Component
             ->all();
     }
 
+    /**
+     * Richer revisions list used by the side-by-side compare overlay · 30
+     * deepest history plus author + edge counts.
+     *
+     * @return array<int, array{id:int,created_at_iso:?string,author_name:?string,block_count:int,node_count:int,edge_count:int}>
+     */
+    #[Computed]
+    public function revisionsList(): array
+    {
+        if ($this->routeId === null) return [];
+
+        return \LoggedCloud\PageStudio\Models\Revision::where('route_id', $this->routeId)
+            ->orderByDesc('id')
+            ->limit(30)
+            ->get()
+            ->map(function ($r) {
+                // author_name is best-effort · resolve the host app's User
+                // model if it has a `name` column · null otherwise.
+                $name = null;
+                if ($r->author_id) {
+                    try {
+                        $userModel = config('auth.providers.users.model');
+                        if ($userModel && class_exists($userModel)) {
+                            $user = $userModel::find($r->author_id);
+                            if ($user && isset($user->name)) $name = (string) $user->name;
+                        }
+                    } catch (\Throwable) {
+                        // Best effort · never crash the panel.
+                    }
+                }
+
+                return [
+                    'id'              => (int) $r->id,
+                    'created_at_iso'  => $r->created_at?->toIso8601String(),
+                    'author_name'     => $name,
+                    'block_count'     => count((array) $r->blocks),
+                    'node_count'      => count((array) $r->nodes),
+                    'edge_count'      => count((array) $r->edges),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * Fetch two revisions on the bound route + a tiny numeric diff between
+     * them. Returns ['a' => null, 'b' => null, 'diff' => ...] if either id
+     * doesn't belong to the same route_id.
+     *
+     * @return array{a: ?\LoggedCloud\PageStudio\Models\Revision, b: ?\LoggedCloud\PageStudio\Models\Revision, diff: array{blocks:int,nodes:int,edges:int}}
+     */
+    public function compareRevisions(int $aId, int $bId): array
+    {
+        $empty = ['a' => null, 'b' => null, 'diff' => ['blocks' => 0, 'nodes' => 0, 'edges' => 0]];
+        if ($this->routeId === null) return $empty;
+
+        $a = \LoggedCloud\PageStudio\Models\Revision::where('route_id', $this->routeId)->find($aId);
+        $b = \LoggedCloud\PageStudio\Models\Revision::where('route_id', $this->routeId)->find($bId);
+        if (! $a || ! $b) return $empty;
+
+        return [
+            'a'    => $a,
+            'b'    => $b,
+            'diff' => [
+                'blocks' => count((array) $b->blocks) - count((array) $a->blocks),
+                'nodes'  => count((array) $b->nodes)  - count((array) $a->nodes),
+                'edges'  => count((array) $b->edges)  - count((array) $a->edges),
+            ],
+        ];
+    }
+
+    /**
+     * UI state for the compare-revisions overlay · null when closed, else
+     * the two picked revision ids the modal is showing.
+     */
+    public bool $compareOpen = false;
+    public ?int $compareAId = null;
+    public ?int $compareBId = null;
+
+    public function openCompare(): void
+    {
+        $list = $this->revisionsList();
+        if (count($list) < 2) {
+            // Need at least two snapshots to compare · open anyway with
+            // whatever is available so the user sees a hint.
+            $this->compareAId = $list[0]['id'] ?? null;
+            $this->compareBId = $list[0]['id'] ?? null;
+        } else {
+            // Default to the two most recent revisions.
+            $this->compareBId = $list[0]['id'];
+            $this->compareAId = $list[1]['id'];
+        }
+        $this->compareOpen = true;
+    }
+
+    public function closeCompare(): void
+    {
+        $this->compareOpen = false;
+    }
+
+    /**
+     * Rendered preview HTML for a side of the compare overlay · returns ''
+     * when the revision id isn't on this route.
+     */
+    public function renderRevisionPreview(?int $revisionId): string
+    {
+        if ($revisionId === null || $this->routeId === null) return '';
+        $rev = \LoggedCloud\PageStudio\Models\Revision::where('route_id', $this->routeId)->find($revisionId);
+        if (! $rev) return '';
+        return PageRenderer::render(
+            BlockTree::sanitise((array) $rev->blocks),
+            $this->variableContext(),
+            true,
+        );
+    }
+
     protected function findNode(string $id): ?array
     {
         foreach ($this->nodes as $node) {
@@ -993,19 +1123,29 @@ class PageBuilder extends Component
             $this->lastSavedAt = now()->toIso8601String();
             $this->snapshotRevision();
             $this->dispatch('page-studio:page:saved',
-                routeId: null,
-                pageId:  null,
-                savedAt: $this->lastSavedAt,
-                blocks:  $this->blocks,
-                meta:    $this->meta,
+                routeId:     null,
+                pageId:      null,
+                savedAt:     $this->lastSavedAt,
+                blocks:      $this->blocks,
+                meta:        $this->meta,
+                status:      $this->status,
+                publishAt:   $this->publishAt,
+                publishedAt: $this->publishedAt,
             );
             return;
         }
 
         $payload = [
-            'blocks' => BlockTree::sanitise($this->blocks),
-            'meta'   => $this->meta,
+            'blocks'     => BlockTree::sanitise($this->blocks),
+            'meta'       => $this->meta,
+            'status'     => $this->status,
+            'publish_at' => $this->publishAt ?: null,
         ];
+        // Only stamp published_at when we already hold one (e.g. publish()
+        // set it just before calling save) · save() itself never auto-stamps.
+        if ($this->publishedAt !== null) {
+            $payload['published_at'] = $this->publishedAt;
+        }
         $page = $this->pageId !== null
             ? tap(Page::find($this->pageId), function ($p) use ($payload) {
                 if ($p) $p->update($payload);
@@ -1013,14 +1153,44 @@ class PageBuilder extends Component
             : Page::updateOrCreate(['route_id' => $this->routeId], $payload);
 
         $this->lastSavedAt = $page?->updated_at?->toIso8601String();
+        // Re-hydrate from the persisted row so casts apply (publish_at gets
+        // normalised, published_at reflects what's actually in the DB).
+        if ($page) {
+            $this->publishAt   = $page->publish_at?->format('Y-m-d\TH:i');
+            $this->publishedAt = $page->published_at?->toIso8601String();
+            $this->status      = (string) ($page->status ?? $this->status);
+        }
         $this->snapshotRevision();
         $this->dispatch('page-studio:page:saved',
-            routeId: $this->routeId,
-            pageId:  $this->pageId,
-            savedAt: $this->lastSavedAt,
-            meta:    $this->meta,
+            routeId:     $this->routeId,
+            pageId:      $this->pageId,
+            savedAt:     $this->lastSavedAt,
+            meta:        $this->meta,
+            status:      $this->status,
+            publishAt:   $this->publishAt,
+            publishedAt: $this->publishedAt,
         );
         if ($page) PageSaved::dispatch($page, auth()->user());
+    }
+
+    /**
+     * Mark the page as published · stamps published_at to now and persists.
+     */
+    public function publish(): void
+    {
+        $this->status      = 'published';
+        $this->publishedAt = now()->toIso8601String();
+        $this->save();
+    }
+
+    /**
+     * Flip a published page back to draft · leaves the prior published_at
+     * stamp on the row for audit / "last published" UI later.
+     */
+    public function unpublish(): void
+    {
+        $this->status = 'draft';
+        $this->save();
     }
 
     #[Computed]

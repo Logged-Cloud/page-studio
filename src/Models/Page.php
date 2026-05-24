@@ -2,6 +2,7 @@
 
 namespace LoggedCloud\PageStudio\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -10,9 +11,21 @@ class Page extends Model
     protected $guarded = [];
 
     protected $casts = [
-        'blocks' => 'array',
-        'meta'   => 'array',
+        'blocks'       => 'array',
+        'meta'         => 'array',
+        'publish_at'   => 'datetime',
+        'published_at' => 'datetime',
     ];
+
+    /**
+     * Scope to pages that are live · status=published AND either no
+     * scheduled publish_at, or the scheduled time has already passed.
+     */
+    public function scopePublished(Builder $q): Builder
+    {
+        return $q->where('status', 'published')
+            ->where(fn ($w) => $w->whereNull('publish_at')->orWhere('publish_at', '<=', now()));
+    }
 
     public function getTable(): string
     {
