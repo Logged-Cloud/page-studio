@@ -13,9 +13,11 @@
         <button type="button"
                 class="ps-pb-rail-toggle"
                 @click="leftCollapsed = ! leftCollapsed"
+                :aria-label="leftCollapsed ? 'Show components rail' : 'Hide components rail'"
+                :aria-pressed="leftCollapsed ? 'true' : 'false'"
                 :title="leftCollapsed ? 'Show components' : 'Hide components'">
-            <span x-show="! leftCollapsed">◀</span>
-            <span x-show="leftCollapsed" x-cloak>▶</span>
+            <span x-show="! leftCollapsed" aria-hidden="true">◀</span>
+            <span x-show="leftCollapsed" x-cloak aria-hidden="true">▶</span>
         </button>
 
         @php $route = $this->route; @endphp
@@ -87,6 +89,7 @@
             <button type="button"
                     class="ps-pb-btn"
                     onclick="window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))"
+                    aria-label="Show keyboard shortcuts"
                     title="Keyboard shortcuts (?)">?</button>
 
             <button type="button"
@@ -139,9 +142,11 @@
             {{-- Optional scheduled publish · datetime-local picker --}}
             <label class="ps-pb-publish-at"
                    title="Publish at (leave empty to publish immediately when you click Publish)">
-                <span class="ps-pb-publish-at-label">⏲</span>
+                <span class="ps-pb-publish-at-label" aria-hidden="true">⏲</span>
+                <span class="ps-pb-visually-hidden">Publish at</span>
                 <input type="datetime-local"
                        wire:model.live="publishAt"
+                       aria-label="Publish at (leave empty to publish immediately)"
                        class="ps-pb-publish-at-input">
             </label>
 
@@ -180,9 +185,11 @@
             <button type="button"
                     class="ps-pb-rail-toggle"
                     @click="rightCollapsed = ! rightCollapsed"
+                    :aria-label="rightCollapsed ? 'Show settings rail' : 'Hide settings rail'"
+                    :aria-pressed="rightCollapsed ? 'true' : 'false'"
                     :title="rightCollapsed ? 'Show settings' : 'Hide settings'">
-                <span x-show="! rightCollapsed">▶</span>
-                <span x-show="rightCollapsed" x-cloak>◀</span>
+                <span x-show="! rightCollapsed" aria-hidden="true">▶</span>
+                <span x-show="rightCollapsed" x-cloak aria-hidden="true">◀</span>
             </button>
         </div>
     </div>
@@ -941,19 +948,25 @@
                                     <button type="button"
                                             class="ps-ne-node-action{{ ! empty($node['muted']) ? ' is-on' : '' }}"
                                             wire:click.stop="toggleMuted(@js($node['id']))"
+                                            aria-label="Mute node"
+                                            aria-pressed="{{ ! empty($node['muted']) ? 'true' : 'false' }}"
                                             title="Mute node · input passes straight through to output">M</button>
                                 @endif
                                 @if (in_array($node['type'] ?? '', ['source.model_finder', 'source.auth_user'], true))
                                     <button type="button"
                                             class="ps-ne-node-action{{ ! empty($node['settings']['expose_fields']) ? ' is-on' : '' }}"
                                             wire:click.stop="toggleModelFields(@js($node['id']))"
+                                            aria-label="Expose fields as outputs"
+                                            aria-pressed="{{ ! empty($node['settings']['expose_fields']) ? 'true' : 'false' }}"
                                             title="Toggle one-socket-per-field vs single model output">⚏</button>
                                 @endif
                                 <button type="button" class="ps-ne-node-action"
                                         wire:click.stop="duplicateNode(@js($node['id']))"
+                                        aria-label="Duplicate node"
                                         title="Duplicate (Ctrl-D)">⎘</button>
                                 <button type="button" class="ps-ne-node-remove"
                                         wire:click.stop="removeNode(@js($node['id']))"
+                                        aria-label="Delete node"
                                         title="Delete">✕</button>
                             </header>
 
@@ -2729,6 +2742,15 @@
                     font: inherit;
                     font-size: .75rem;
                     outline: none;
+                }
+                .ps-pb-visually-hidden {
+                    position: absolute !important;
+                    width: 1px; height: 1px;
+                    padding: 0; margin: -1px;
+                    overflow: hidden;
+                    clip: rect(0, 0, 0, 0);
+                    white-space: nowrap;
+                    border: 0;
                 }
                 .ps-pb-rail-toggle {
                     background: transparent;
