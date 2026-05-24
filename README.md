@@ -69,43 +69,250 @@ The Livewire components mount as soon as `livewire/livewire` is present:
 ## Quick start
 
 ```blade
-{{-- Build a route with variables --}}
+{{-- The full studio · route builder + page builder + node editor wired to a route --}}
 @livewire('page-studio.route-builder')
-
-{{-- Once a route is saved, build a page bound to it --}}
 @livewire('page-studio.page-builder', ['routeId' => $route->id])
+```
 
-{{-- Or skip the route entirely · pass variables in directly. Useful when
-     you only need the page builder (e.g. a campaign editor) and have
-     already-known values for things like Campaign name, Client email. --}}
+That's the three-stage flow. The rest of this section covers the two common variations: passing variables in directly, and rendering pages without using the route builder at all.
+
+---
+
+## Passing variables in
+
+The page-builder accepts a `variables` payload at mount time. Authors see one drag chip per entry; the renderer substitutes the values into `{{ tokens }}` at output time.
+
+### Flat shape · `name => preview`
+
+```blade
 @livewire('page-studio.page-builder', [
     'variables' => [
         'campaign_name' => 'Summer 2026',
         'client_email'  => 'foo@bar.com',
     ],
 ])
+```
 
-{{-- Bind to a specific Page row by its primary key, with optional vars --}}
-@livewire('page-studio.page-builder', ['pageId' => $page->id, 'variables' => [...]])
+### Eloquent models · auto-flattened to dot-paths
 
-{{-- Pass whole Eloquent models · the builder flattens them to dot-paths
-     so authors can drop chips for {{ user.email }} or {{ booking.id }}. --}}
+Pass a whole model and the builder exposes one chip per attribute:
+
+```blade
 @livewire('page-studio.page-builder', [
     'variables' => [
-        'user'    => auth()->user(),
-        'booking' => $booking,
-        'config'  => ['from_name' => 'Acme', 'reply_to' => 'support@acme.com'],
+        'user'    => auth()->user(),     // chips: {{ user }}, {{ user.name }}, {{ user.email }}, ...
+        'booking' => $booking,           // chips: {{ booking }}, {{ booking.id }}, {{ booking.total }}, ...
     ],
 ])
-
-{{-- Render the saved page on the actual URL --}}
-@php
-    use LoggedCloud\PageStudio\Models\Page;
-    use LoggedCloud\PageStudio\Support\PageRenderer;
-    $page = Page::where('route_id', $route->id)->first();
-@endphp
-{!! PageRenderer::render($page->blocks, $page->previewContext()) !!}
 ```
+
+`{{ user.email }}` resolves via Laravel's `data_get`, so the same shape also works for nested arrays:
+
+```blade
+@livewire('page-studio.page-builder', [
+    'variables' => [
+        'config' => ['from_name' => 'Acme', 'reply_to' => 'support@acme.com'],
+    ],
+])
+{{-- {{ config.from_name }} → 'Acme' --}}
+```
+
+### Richer per-chip labels
+
+If you want a friendlier chip label than the variable name:
+
+```blade
+@livewire('page-studio.page-builder', [
+    'variables' => [
+        ['name' => 'campaign_name', 'label' => 'Campaign', 'preview' => 'Summer 2026'],
+        ['name' => 'client_email',  'label' => 'Client email', 'preview' => 'foo@bar.com'],
+    ],
+])
+```
+
+---
+
+## Rendering a page without the route builder
+
+If you skip the route builder you're responsible for two things: **where the blocks live**, and **where they render**. There's no magic auto-route in this mode.
+
+### Step 1 · Store the blocks somewhere
+
+Two options, pick what fits the rest of your schema:
+
+```php
+// Option A · the package's Page table, with route_id null
+use LoggedCloud\PageStudio\Models\Page;
+
+$page = Page::create([
+    'route_id' => null,
+    'blocks'   => [],   // empty until the author saves
+]);
+
+// Option B · your own column on your own model
+Schema::table('campaigns', fn ($t) => $t->json('blocks')->nullable());
+
+class Campaign extends Model
+{
+    protected $casts = ['blocks' => 'array'];
+}
+```
+
+### Step 2 · Mount the page-builder against the storage you picked
+
+```blade
+{{-- A · bind to the package's Page row directly --}}
+@livewire('page-studio.page-builder', [
+    'pageId'    => $page->id,
+    'variables' => ['campaign' => $campaign, 'user' => auth()->user()],
+])
+
+{{-- B · ephemeral · listen for the saved event and store the blocks yourself --}}
+@livewire('page-studio.page-builder', [
+    'variables' => ['campaign' => $campaign],
+])
+
+<script>
+    Livewire.on('page-studio:page:saved', (e) => {
+        // e.blocks is the authored tree · POST it to your endpoint
+        fetch('/campaigns/{{ $campaign->id }}/blocks', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            body: JSON.stringify({ blocks: e.blocks }),
+        });
+    });
+</script>
+```
+
+### Step 3 · Add your own route in `routes/web.php`
+
+The package only auto-registers routes for `RouteDefinition` rows (the route-builder output). For everything else, **you write your own**:
+
+```php
+// routes/web.php
+use App\Models\Campaign;
+use LoggedCloud\PageStudio\Support\PageRenderer;
+
+Route::get('/campaigns/{campaign:slug}', function (Campaign $campaign) {
+    return view('campaigns.show', [
+        'html' => PageRenderer::render($campaign->blocks ?? [], [
+            'campaign' => $campaign,
+            'user'     => auth()->user(),
+        ]),
+    ]);
+});
+```
+
+```blade
+{{-- resources/views/campaigns/show.blade.php --}}
+<x-layout>
+    {!! $html !!}
+</x-layout>
+```
+
+`PageRenderer::render($blocks, $context)` is the single entry point. The context array uses the same shape as the `variables` payload above, so any chip the author dragged in resolves correctly.
+
+### Or skip the page entirely · render straight to a string
+
+Useful for email bodies, PDFs, slack/discord webhooks, anything that isn't an HTTP response:
+
+```php
+$body = PageRenderer::render($campaign->blocks ?? [], [
+    'campaign' => $campaign,
+    'user'     => $recipient,
+]);
+
+Mail::raw($body, fn ($m) => $m->to($recipient)->subject($campaign->subject));
+```
+
+---
+
+## Use cases beyond the obvious
+
+The package is built for "authored content + runtime data". Anywhere that
+pattern shows up, the page-builder fits.
+
+### Email composition (the original driver)
+
+Replace a CKEditor / TinyMCE textarea in a Livewire component. Variables come from the controller (booking, customer, program), the editor saves blocks, your existing send pipeline calls `PageRenderer::render()` on those blocks to produce the email HTML.
+
+```blade
+@livewire('page-studio.page-builder', [
+    'variables' => [
+        'program' => $program,
+        'user'    => $recipient,
+        'greeting' => $program->emailGreeting ?? 'Dear',
+    ],
+])
+```
+
+### Marketing landing pages
+
+Author at `/admin/campaigns/{id}/page-builder`, render at `/campaigns/{slug}`. Variables come from the campaign row + the visitor's resolved offer context. UTM parameters live in `variables` too so authors can write "Hi {{ utm.source }} visitor".
+
+### Customer dashboards · personalised content blocks
+
+A self-service portal where the welcome screen is authored, not coded. Each user sees their own data merged in:
+
+```blade
+@livewire('page-studio.page-builder', [
+    'pageId'    => $tenant->welcome_page_id,
+    'variables' => [
+        'user'    => auth()->user(),
+        'team'    => auth()->user()->team,
+        'metrics' => $tenant->dashboardMetrics(),  // array of named counters
+    ],
+])
+```
+
+### Document generation · invoices, receipts, certificates
+
+Author the template once, render to HTML, pass through dompdf / browsershot / wkhtmltopdf.
+
+```php
+$html = PageRenderer::render($template->blocks, [
+    'invoice'  => $invoice,
+    'customer' => $invoice->customer,
+    'company'  => $tenant,
+]);
+return Browsershot::html($html)->pdf();
+```
+
+### Onboarding + form wizards
+
+Multi-step wizards where each step is an authored page. Step content lives in the page-studio block tree; form fields are the host app's own Livewire inputs rendered alongside. Variables: the form state so far.
+
+### Knowledge base / internal docs
+
+Non-developers author articles in the studio; the live data they reference (deployment versions, on-call rotations, customer counts) flows in as variables.
+
+```php
+PageRenderer::render($article->blocks, [
+    'version'  => config('app.version'),
+    'oncall'   => OnCall::current(),
+    'metrics'  => Metrics::today(),
+]);
+```
+
+### A/B variants on a single route
+
+Store multiple Page rows keyed by variant name; pick at request time:
+
+```php
+$page = Page::where('campaign_id', $campaign->id)
+    ->where('variant', $request->cookie('variant', 'control'))
+    ->firstOrFail();
+
+return PageRenderer::render($page->blocks, [...]);
+```
+
+### SMS / push notification bodies
+
+Templates as block trees, rendered with the short-form `paragraph`-only output stripped of HTML tags. Authors get the same variable-chip experience as email but the renderer truncates and flattens for the SMS provider's payload limit.
+
+### Status / incident pages
+
+A public `/status` route reading from a page authored in the studio, mixing prose ("Investigating an issue affecting…") with live data variables (uptime %, last 5 incidents, current latency).
 
 ---
 
