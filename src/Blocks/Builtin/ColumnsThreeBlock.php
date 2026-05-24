@@ -74,4 +74,11 @@ class ColumnsThreeBlock extends BlockType
              . PageRenderer::renderChildrenForText($children, 'middle', $context)
              . PageRenderer::renderChildrenForText($children, 'right',  $context);
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::renderChildrenForMarkdown($children, 'left',   $context)
+             . PageRenderer::renderChildrenForMarkdown($children, 'middle', $context)
+             . PageRenderer::renderChildrenForMarkdown($children, 'right',  $context);
+    }
 }

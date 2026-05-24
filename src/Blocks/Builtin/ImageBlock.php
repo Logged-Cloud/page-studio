@@ -49,4 +49,11 @@ class ImageBlock extends BlockType
         $alt = (string) ($settings['alt'] ?? '');
         return $alt !== '' ? "[image: {$alt}] {$src}\n\n" : "[image] {$src}\n\n";
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        $src = PageRenderer::substitute((string) ($settings['src'] ?? ''), $context);
+        $alt = PageRenderer::substitute((string) ($settings['alt'] ?? ''), $context);
+        return "![{$alt}]({$src})\n\n";
+    }
 }

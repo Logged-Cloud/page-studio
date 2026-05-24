@@ -237,6 +237,58 @@ class PageRenderer
     }
 
     /**
+     * Markdown counterpart to `render()` · prefers each block's
+     * `renderMarkdown()` override, falls back to `renderText()` (markdown
+     * is a superset of plain text), and finally to stripping HTML from
+     * the regular render. Collapses runaway blank lines the same way
+     * `renderForText` does so the output is safe to drop into a `.md` file.
+     */
+    public static function renderForMarkdown(array $blocks, array $context = []): string
+    {
+        $out = '';
+        foreach ($blocks as $block) {
+            $out .= self::renderBlockForMarkdown($block, $context);
+        }
+        $out = preg_replace("/\n{3,}/", "\n\n", $out) ?? $out;
+        return rtrim($out, "\n")."\n";
+    }
+
+    public static function renderBlockForMarkdown(array $block, array $context = []): string
+    {
+        $type = $block['type'] ?? null;
+        if (! $type) return '';
+        $class = \LoggedCloud\PageStudio\Blocks\BlockRegistry::find($type);
+        if (! $class) return '';
+
+        try {
+            /** @var \LoggedCloud\PageStudio\Blocks\BlockType $instance */
+            $instance = new $class();
+            $settings = $block['settings']        ?? [];
+            $children = is_array($block['children'] ?? null) ? $block['children'] : [];
+
+            $md = $instance->renderMarkdown($settings, $children, $context);
+            if ($md !== null) return $md;
+
+            // Markdown is a superset of plain text · existing renderText
+            // overrides already emit valid markdown for headings, lists,
+            // code fences, dividers, quotes, etc.
+            $text = $instance->renderText($settings, $children, $context);
+            if ($text !== null) return $text;
+
+            $html = $instance->render($settings, $children, $context, false);
+            return self::stripToText($html);
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    public static function renderChildrenForMarkdown(array $children, string $slot, array $context): string
+    {
+        $kids = $children[$slot] ?? [];
+        return is_array($kids) ? self::renderForMarkdown($kids, $context) : '';
+    }
+
+    /**
      * Strip HTML to readable plain text · used as the fallback shape when a
      * block doesn't ship its own `renderText()`.
      */

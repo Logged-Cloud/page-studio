@@ -87,4 +87,10 @@ class ColumnsBlock extends BlockType
         return PageRenderer::renderChildrenForText($children, 'left',  $context)
              . PageRenderer::renderChildrenForText($children, 'right', $context);
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::renderChildrenForMarkdown($children, 'left',  $context)
+             . PageRenderer::renderChildrenForMarkdown($children, 'right', $context);
+    }
 }

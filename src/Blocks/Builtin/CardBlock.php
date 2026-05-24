@@ -101,4 +101,18 @@ class CardBlock extends BlockType
         $out .= $body;
         return $out;
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        $title    = PageRenderer::substitute((string) ($settings['title']    ?? ''), $context);
+        $subtitle = PageRenderer::substitute((string) ($settings['subtitle'] ?? ''), $context);
+        $body     = PageRenderer::renderChildrenForMarkdown($children, 'body', $context);
+
+        $out = '';
+        if ($title    !== '') $out .= "{$title}\n";
+        if ($subtitle !== '') $out .= "{$subtitle}\n";
+        if ($out !== '')      $out .= "\n";
+        $out .= $body;
+        return $out;
+    }
 }

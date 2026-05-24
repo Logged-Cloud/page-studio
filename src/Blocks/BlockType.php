@@ -98,6 +98,19 @@ abstract class BlockType
     }
 
     /**
+     * Markdown renderer · pairs with `PageRenderer::renderForMarkdown()` to
+     * emit a markdown copy of the page. Return null and the walker falls
+     * back to the plain-text renderer (markdown is a superset of plain
+     * text) and finally to stripped HTML · override when markdown syntax
+     * gives a strictly better result than plain text (heading levels,
+     * link syntax, image syntax, table pipes).
+     */
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        return null;
+    }
+
+    /**
      * Library entry · palette renderer + page builder schema lookup read
      * this exact shape from `config('page-studio.blocks')`.
      */

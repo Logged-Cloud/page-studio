@@ -13,6 +13,7 @@ class PageStudioServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 Console\RenderStaticCommand::class,
+                Console\ExportStaticSiteCommand::class,
                 Console\ExportCommand::class,
                 Console\ImportCommand::class,
                 Console\DiscoverModelsCommand::class,
