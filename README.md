@@ -88,6 +88,16 @@ The Livewire components mount as soon as `livewire/livewire` is present:
 {{-- Bind to a specific Page row by its primary key, with optional vars --}}
 @livewire('page-studio.page-builder', ['pageId' => $page->id, 'variables' => [...]])
 
+{{-- Pass whole Eloquent models · the builder flattens them to dot-paths
+     so authors can drop chips for {{ user.email }} or {{ booking.id }}. --}}
+@livewire('page-studio.page-builder', [
+    'variables' => [
+        'user'    => auth()->user(),
+        'booking' => $booking,
+        'config'  => ['from_name' => 'Acme', 'reply_to' => 'support@acme.com'],
+    ],
+])
+
 {{-- Render the saved page on the actual URL --}}
 @php
     use LoggedCloud\PageStudio\Models\Page;
@@ -212,6 +222,37 @@ class ProductTemplate extends Template
     }
 }
 ```
+
+---
+
+### Importing existing HTML
+
+Migrating off a wysiwyg editor (CKEditor, TinyMCE, Trix)? Use `HtmlImporter::toBlocks($html)` to convert a stored HTML blob into a page-studio block tree:
+
+```php
+use LoggedCloud\PageStudio\Support\HtmlImporter;
+
+$blocks = HtmlImporter::toBlocks($message->Message);
+
+// Persist into a Page row · the page-builder will load it.
+Page::create(['route_id' => null, 'blocks' => $blocks]);
+```
+
+Mapping:
+
+| HTML | Block type |
+|---|---|
+| `<h1>`–`<h4>` | `heading` (level + text) |
+| `<p>` | `paragraph` |
+| `<ul>` / `<ol>` | `list` (style = bullet / number) |
+| `<img>` | `image` (src + alt) |
+| `<blockquote>` | `quote` |
+| `<pre>` | `code` |
+| `<hr>` | `divider` |
+| `<table>` | `table` (raw HTML preserved) |
+| everything else | falls back to `paragraph` with the text content |
+
+Tokens like `{{ user.email }}` survive intact so the renderer substitutes them at output time.
 
 ---
 
