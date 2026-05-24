@@ -84,6 +84,16 @@ The in-page finder: Ctrl-F or `/` opens a palette over blocks and nodes, with ty
 
 ![Finder overlay showing matched heading blocks and a route_variable node](docs/screenshots/finder.png)
 
+Collaboration: block locks ribbon the block another reviewer is editing; presence chips surface other peers in the topbar; review threads and an activity feed live in the right rail.
+
+![Block lock ribbon · "🔒 Alice editing" on a heading block](docs/screenshots/collab-block-lock.png)
+
+![Presence chips in the top bar showing two other active peers](docs/screenshots/collab-presence.png)
+
+![Right rail Comments tab with one open thread and a nested reply](docs/screenshots/collab-comments.png)
+
+![Activity feed listing recent saves, a publish, and a comment](docs/screenshots/collab-activity.png)
+
 Mobile: the rails collapse to slide-in sheets, the node drawer hides by default, the canvas owns the screen. Touch users get a real surface to work on.
 
 ![Page builder on a phone-width viewport with a heading, paragraph, divider, and CTA button](docs/screenshots/mobile.png)
