@@ -66,6 +66,13 @@
                     onclick="window.dispatchEvent(new KeyboardEvent('keydown', { key: '?' }))"
                     title="Keyboard shortcuts (?)">?</button>
 
+            <button type="button"
+                    class="ps-pb-btn"
+                    @click="libraryOpen = true"
+                    title="Snippet library · rename or delete saved snippets">
+                ★ Library
+            </button>
+
             @if ($this->nodeEditorEnabled())
                 <button type="button" wire:click="toggleDrawer"
                         class="ps-pb-btn ps-pb-nodes-btn"
@@ -215,6 +222,36 @@
                         </div>
                     </section>
                 @endforeach
+
+                {{-- Snippet library · saved blocks the author can drop into any
+                     page. Click appends to root, drag drops at the target. --}}
+                @php $snips = $this->snippetLibrary; @endphp
+                @if (! empty($snips))
+                    @php
+                        $snipGroups = [];
+                        foreach ($snips as $s) { $snipGroups[$s['group']][] = $s; }
+                    @endphp
+                    @foreach ($snipGroups as $group => $items)
+                        <section class="ps-pb-section ps-pb-snippets">
+                            <h3>{{ ucfirst($group) }}</h3>
+                            <div class="ps-pb-palette">
+                                @foreach ($items as $s)
+                                    <button type="button"
+                                            class="ps-pb-palette-item"
+                                            draggable="true"
+                                            wire:key="snip-{{ $s['id'] }}"
+                                            @dragstart.stop="onSnippetDragStart($event, @js($s['name']))"
+                                            @pointerdown="startTouchDrag($event, 'snippet', @js($s['name']), @js($s['label']))"
+                                            @click="$wire.dropSnippet(@js($s['name']))"
+                                            :title="@js('Drop ' . $s['label'] . ' · drag onto the canvas or click to append')">
+                                        <span class="ps-pb-palette-icon">{{ $s['icon'] }}</span>
+                                        <span>{{ $s['label'] }}</span>
+                                    </button>
+                                @endforeach
+                            </div>
+                        </section>
+                    @endforeach
+                @endif
 
                 {{-- Outline · a tree of the current page's block hierarchy. --}}
                 @if (! empty($blocks))
@@ -1133,6 +1170,14 @@
             @endforeach
         @endif
 
+        <div class="ps-pb-block-ctx-section">Library</div>
+        <button type="button" class="ps-pb-block-ctx-item"
+                @click.stop="openSnippetPrompt()"
+                role="menuitem">
+            <span class="ps-pb-block-ctx-icon">★</span>
+            <span>Save as snippet...</span>
+        </button>
+
         <div class="ps-pb-block-ctx-section">Danger</div>
         <button type="button" class="ps-pb-block-ctx-item ps-pb-block-ctx-danger"
                 @click.stop="removeHere()"
@@ -1140,6 +1185,94 @@
             <span class="ps-pb-block-ctx-icon">✕</span>
             <span>Remove</span>
         </button>
+    </div>
+
+    {{-- Save-as-snippet prompt · tiny modal anchored over the menu --}}
+    <div x-show="snippetPrompt.open"
+         x-cloak
+         class="ps-pb-find-wrap"
+         @keydown.escape.window="snippetPrompt.open = false">
+        <div class="ps-pb-find-backdrop" @click="snippetPrompt.open = false"></div>
+        <div class="ps-pb-find ps-pb-snippet-prompt" role="dialog" aria-label="Save as snippet">
+            <h3>Save as snippet</h3>
+            <label class="ps-pb-replace-field">
+                <span>Name (unique handle)</span>
+                <input type="text"
+                       x-ref="snippetName"
+                       x-model="snippetPrompt.name"
+                       placeholder="hero-callout"
+                       @keydown.enter.prevent="commitSnippet()">
+            </label>
+            <label class="ps-pb-replace-field">
+                <span>Label (shown in the palette)</span>
+                <input type="text"
+                       x-model="snippetPrompt.label"
+                       placeholder="Hero callout"
+                       @keydown.enter.prevent="commitSnippet()">
+            </label>
+            <div class="ps-pb-replace-actions">
+                <button type="button" class="ps-pb-btn" @click="snippetPrompt.open = false">Cancel</button>
+                <button type="button" class="ps-pb-btn ps-pb-btn--primary"
+                        :disabled="! snippetPrompt.name.trim()"
+                        @click="commitSnippet()">Save snippet</button>
+            </div>
+        </div>
+    </div>
+
+    {{-- Snippet library overlay · rename + delete each saved snippet --}}
+    <div x-show="libraryOpen"
+         x-cloak
+         class="ps-pb-cheats-wrap"
+         @keydown.escape.window="libraryOpen = false">
+        <div class="ps-pb-cheats-backdrop" @click="libraryOpen = false"></div>
+        <div class="ps-pb-cheats ps-pb-library">
+            <h3>Snippet library</h3>
+            @php $libraryItems = $this->snippetLibrary; @endphp
+            @if (empty($libraryItems))
+                <p class="ps-pb-hint">No snippets yet · right-click any block and choose "Save as snippet..." to build the library.</p>
+            @else
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Icon</th>
+                            <th>Name</th>
+                            <th>Label</th>
+                            <th>Group</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($libraryItems as $s)
+                            <tr wire:key="lib-{{ $s['id'] }}">
+                                <td>{{ $s['icon'] }}</td>
+                                <td>
+                                    <input type="text"
+                                           value="{{ $s['name'] }}"
+                                           @change="$wire.renameSnippet({{ $s['id'] }}, $event.target.value, $event.target.closest('tr').querySelector('[data-snip-label]').value)">
+                                </td>
+                                <td>
+                                    <input type="text"
+                                           data-snip-label
+                                           value="{{ $s['label'] }}"
+                                           @change="$wire.renameSnippet({{ $s['id'] }}, $event.target.closest('tr').querySelector('input').value, $event.target.value)">
+                                </td>
+                                <td>{{ $s['group'] }}</td>
+                                <td>
+                                    <button type="button" class="ps-pb-btn"
+                                            wire:click="dropSnippet(@js($s['name']))"
+                                            @click="libraryOpen = false">Drop</button>
+                                    <button type="button" class="ps-pb-btn ps-pb-block-ctx-danger"
+                                            wire:click="deleteSnippet({{ $s['id'] }})"
+                                            @click="$event.preventDefault()"
+                                            onclick="if(! confirm('Delete this snippet?')) return false;">Delete</button>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+            <footer><button type="button" @click="libraryOpen = false" class="ps-pb-btn">Close</button></footer>
+        </div>
     </div>
 
     {{-- Always-on toast container · fixed-positioned so it's never clipped --}}
@@ -1381,6 +1514,10 @@
                         // Right-click block context menu · path is the block
                         // the user invoked the menu over.
                         blockCtx: { open: false, x: 0, y: 0, path: '' },
+                        // Save-as-snippet prompt · open by the context menu,
+                        // remembers the block path while the user types.
+                        snippetPrompt: { open: false, path: '', name: '', label: '' },
+                        libraryOpen: false,
                         toast: { show: false, ok: true, message: '' },
                         toastTimer: null,
 
@@ -1413,6 +1550,16 @@
                             try {
                                 e.dataTransfer.setData('text/plain', 'ps-pb-palette:' + type);
                                 e.dataTransfer.setData('application/x-page-studio', JSON.stringify({ kind: 'palette', type }));
+                                e.dataTransfer.effectAllowed = 'copy';
+                            } catch (_) {}
+                        },
+
+                        onSnippetDragStart(e, name) {
+                            this.dragKind = 'snippet';
+                            this.dragPayload = name;
+                            try {
+                                e.dataTransfer.setData('text/plain', 'ps-pb-snippet:' + name);
+                                e.dataTransfer.setData('application/x-page-studio', JSON.stringify({ kind: 'snippet', name }));
                                 e.dataTransfer.effectAllowed = 'copy';
                             } catch (_) {}
                         },
@@ -1461,7 +1608,7 @@
                         },
 
                         onCanvasDragOver(e) {
-                            if (this.dragKind !== 'palette' && this.dragKind !== 'block') return;
+                            if (this.dragKind !== 'palette' && this.dragKind !== 'block' && this.dragKind !== 'snippet') return;
                             this.dropTarget = { parentPath: '', slot: null, index: this.segmentCount };
                             e.dataTransfer.dropEffect = this.dragKind === 'block' ? 'move' : 'copy';
                         },
@@ -1477,7 +1624,7 @@
                         },
 
                         onBlockDragOver(e, parentPath, slot, index) {
-                            if (this.dragKind !== 'palette' && this.dragKind !== 'block') return;
+                            if (this.dragKind !== 'palette' && this.dragKind !== 'block' && this.dragKind !== 'snippet') return;
                             const r = e.currentTarget.getBoundingClientRect();
                             const inTopHalf = (e.clientY - r.top) < r.height / 2;
                             this.dropTarget = {
@@ -1492,7 +1639,7 @@
                         },
 
                         onSlotDragOver(e, parentPath, slot, kidCount) {
-                            if (this.dragKind !== 'palette' && this.dragKind !== 'block') return;
+                            if (this.dragKind !== 'palette' && this.dragKind !== 'block' && this.dragKind !== 'snippet') return;
                             // Default position when hovering an empty slot or the
                             // empty space inside a slot · append to the end.
                             this.dropTarget = { parentPath, slot, index: kidCount };
@@ -1509,6 +1656,8 @@
                         commitDrop(target) {
                             if (this.dragKind === 'palette') {
                                 this.$wire.addBlock(this.dragPayload, target.parentPath, target.slot, target.index);
+                            } else if (this.dragKind === 'snippet') {
+                                this.$wire.dropSnippet(this.dragPayload, target.parentPath, target.slot, target.index);
                             } else if (this.dragKind === 'block') {
                                 // Don't move a block into itself or any of its descendants.
                                 if (this.isPathDescendant(target.parentPath, this.dragPayload)) {
@@ -1667,6 +1816,27 @@
                         moveInto(toBlockPath, toSlot) {
                             this.$wire.moveBlock(this.blockCtx.path, toBlockPath, toSlot, 0);
                             this.closeBlockCtxMenu();
+                        },
+
+                        openSnippetPrompt() {
+                            this.snippetPrompt = {
+                                open: true,
+                                path: this.blockCtx.path,
+                                name: '',
+                                label: '',
+                            };
+                            this.closeBlockCtxMenu();
+                            this.$nextTick(() => { if (this.$refs.snippetName) this.$refs.snippetName.focus(); });
+                        },
+
+                        async commitSnippet() {
+                            const name  = (this.snippetPrompt.name  || '').trim();
+                            const label = (this.snippetPrompt.label || '').trim();
+                            const path  = this.snippetPrompt.path;
+                            if (! name) return;
+                            await this.$wire.saveAsSnippet(path, name, label);
+                            this.snippetPrompt.open = false;
+                            this.showToast('Snippet saved · ' + (label || name), true);
                         },
                     };
                 };
