@@ -8,8 +8,8 @@ A Laravel package that turns "let users build pages and routes from a form" into
 
 Designed to drop into any Livewire 3+ Laravel app.
 
-> **Extending the studio?** Two step-by-step tutorials live under `docs/tutorials/`:
-> [Build a custom block](docs/tutorials/custom-blocks.md) · [Build a custom node](docs/tutorials/custom-nodes.md)
+> **Extending the studio?** Step-by-step tutorials live under `docs/tutorials/`:
+> [Build a custom block](docs/tutorials/custom-blocks.md) · [Build a custom node](docs/tutorials/custom-nodes.md) · [Theming + light mode](docs/tutorials/theming.md)
 
 ---
 
@@ -27,6 +27,7 @@ Designed to drop into any Livewire 3+ Laravel app.
 - **Tutorials**
   - [Custom blocks · developer-defined](docs/tutorials/custom-blocks.md)
   - [Custom nodes · developer-defined](docs/tutorials/custom-nodes.md)
+  - [Theming · light mode + your own palette](docs/tutorials/theming.md)
 - [Starter templates](#starter-templates)
 - [Importing existing HTML](#importing-existing-html)
 - [Custom blocks (in this README)](#custom-blocks--developer-defined)
@@ -731,6 +732,8 @@ echo $ctx['displayName']; // value produced by an Output node named "displayName
 ---
 
 ## Theming
+
+> **Step-by-step walkthrough:** [docs/tutorials/theming.md](docs/tutorials/theming.md) · a complete light-mode preset, `prefers-color-scheme` auto-switching, alternative palettes (warm, high-contrast, brand-tied), per-mount scoped overrides, and how to re-skin the rendered page itself.
 
 The studio's chrome (drawer, palette, node headers, settings panel) honours a small set of CSS variables you can override from the host app's main stylesheet:
 
