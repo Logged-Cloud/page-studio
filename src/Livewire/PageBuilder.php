@@ -13,6 +13,7 @@ use LoggedCloud\PageStudio\Models\BlockLock;
 use LoggedCloud\PageStudio\Models\Page;
 use LoggedCloud\PageStudio\Models\Presence;
 use LoggedCloud\PageStudio\Models\RouteDefinition;
+use LoggedCloud\PageStudio\Models\BlockComment;
 use LoggedCloud\PageStudio\Models\NodeGraph;
 use LoggedCloud\PageStudio\Support\BlockFactory;
 use LoggedCloud\PageStudio\Support\BlockTree;
@@ -83,6 +84,29 @@ class PageBuilder extends Component
     public string $selectedPath = '';
 
     public bool $previewMode = false;
+
+    /**
+     * Right-rail view selector · 'settings' (default) shows the block
+     * settings panel, 'comments' shows the review-thread panel for the
+     * currently selected block. The two share the rail surface so the
+     * user can flick between editing and reviewing without losing
+     * selection state.
+     */
+    public string $rightRailView = 'settings';
+
+    /**
+     * Draft comment body bound to the compose form's textarea. Cleared
+     * after each successful post so the field resets without an
+     * Alpine round-trip.
+     */
+    public string $newCommentBody = '';
+
+    /**
+     * Optional in-flight reply target · when set, the compose form
+     * posts as a reply to this parent comment id instead of a new
+     * top-level thread.
+     */
+    public ?int $replyingTo = null;
 
     /**
      * Last successful save timestamp · shown in the top bar so the user sees
@@ -1379,59 +1403,6 @@ class PageBuilder extends Component
         }
     }
 
-    /**
-     * Record a comment against a block · the comment payload itself
-     * is stored on the Activity row so we don't need a separate table
-     * for the polling-only feed. A future host can ship a richer
-     * Comment model that hangs off the same payload shape.
-     */
-    public function addComment(string $blockId, string $body, ?string $blockLabel = null): void
-    {
-        if ($this->pageId === null && $this->routeId === null) return;
-        $body = trim($body);
-        if ($body === '') return;
-
-        [$authorId, $authorName] = $this->currentAuthor();
-        Activity::create([
-            'page_id'     => $this->pageId,
-            'route_id'    => $this->routeId,
-            'verb'        => 'comment_added',
-            'author_id'   => $authorId,
-            'author_name' => $authorName,
-            'payload'     => array_filter([
-                'block_id'    => $blockId,
-                'block_label' => $blockLabel,
-                'body'        => $body,
-            ], fn ($v) => $v !== null && $v !== ''),
-        ]);
-    }
-
-    /**
-     * Mark a previously-added comment resolved · the resolver is the
-     * person clicking the tick, not necessarily the original commenter.
-     */
-    public function resolveComment(int $activityId): void
-    {
-        if ($this->pageId === null && $this->routeId === null) return;
-
-        $original = Activity::find($activityId);
-        if (! $original || $original->verb !== 'comment_added') return;
-
-        [$authorId, $authorName] = $this->currentAuthor();
-        Activity::create([
-            'page_id'     => $this->pageId,
-            'route_id'    => $this->routeId,
-            'verb'        => 'comment_resolved',
-            'author_id'   => $authorId,
-            'author_name' => $authorName,
-            'payload'     => array_filter([
-                'block_id'    => $original->payload['block_id']    ?? null,
-                'block_label' => $original->payload['block_label'] ?? null,
-                'resolved_id' => $activityId,
-            ], fn ($v) => $v !== null && $v !== ''),
-        ]);
-    }
-
     // ─── Collaboration · block locks, presence, activity feed ───────────
     //
     // All three layers run polling-only (no Echo / Reverb) so the package
@@ -1451,13 +1422,11 @@ class PageBuilder extends Component
         $user = auth()->user();
         if (! $user) return [null, 'Anonymous'];
 
-        $id   = $user->getKey();
-        // Best-effort name resolution · most Laravel User models expose
-        // `name`, but the Authenticatable contract only guarantees an
-        // identifier. Fall back to email, then to the id.
-        $name = $user->name
-            ?? $user->email
-            ?? ('User '.$id);
+        // Authenticatable contract guarantees getAuthIdentifier · use that
+        // instead of getKey so GenericUser + test-only auth shapes also
+        // resolve cleanly.
+        $id = method_exists($user, 'getAuthIdentifier') ? $user->getAuthIdentifier() : ($user->id ?? null);
+        $name = ($user->name ?? null) ?: ($user->email ?? null) ?: ('User '.($id ?? '?'));
         return [$id, (string) $name];
     }
 
@@ -2034,6 +2003,278 @@ class PageBuilder extends Component
     {
         if ($parentPath === '') return (string) $index;
         return $parentPath.'/'.$slot.'/'.$index;
+    }
+
+    // ─── Block comments / review threads ────────────────────────────────────
+
+    /**
+     * Resolve the bindable Page id for comments. Returns the explicit
+     * `$pageId` when set, otherwise updateOrCreate's a row for the bound
+     * route so the very first comment on a never-saved route still has
+     * an FK to hang off. Returns null in fully ephemeral mode (no
+     * pageId and no routeId), which the comment methods treat as
+     * "comments unavailable".
+     */
+    protected function bindablePageId(): ?int
+    {
+        if ($this->pageId !== null) return $this->pageId;
+        if ($this->routeId === null) return null;
+
+        $existing = Page::where('route_id', $this->routeId)->value('id');
+        if ($existing !== null) return (int) $existing;
+
+        // Create a stub Page row so review threads have an FK target
+        // even before the author has explicitly saved the page.
+        $page = Page::updateOrCreate(
+            ['route_id' => $this->routeId],
+            ['blocks' => [], 'meta' => [], 'status' => 'draft'],
+        );
+        return (int) $page->id;
+    }
+
+    /**
+     * Resolve the current host-app user's display name for archival on
+     * the comment row. Falls back to email and then null.
+     */
+    protected function currentAuthorName(): ?string
+    {
+        $user = auth()->user();
+        if (! $user) return null;
+        // Property access is the cleanest way to handle either a real
+        // Eloquent model (name attribute) or a stub auth user in tests.
+        $name = is_object($user) ? ($user->name ?? null) : null;
+        if ($name) return (string) $name;
+        $email = is_object($user) ? ($user->email ?? null) : null;
+        return $email ? (string) $email : null;
+    }
+
+    /**
+     * Post a comment on $blockId. Refuses in ephemeral mode (no page
+     * binding) and ignores empty / whitespace-only bodies so the UI
+     * doesn't have to defend against an over-eager Enter keypress.
+     */
+    public function addComment(string $blockId, string $body, ?int $parentId = null): void
+    {
+        $body = trim($body);
+        if ($body === '') return;
+        if ($blockId === '') return;
+
+        $pageId = $this->bindablePageId();
+        if ($pageId === null) return;
+
+        $comment = BlockComment::create([
+            'page_id'     => $pageId,
+            'block_id'    => $blockId,
+            'parent_id'   => $parentId,
+            'author_id'   => auth()->id(),
+            'author_name' => $this->currentAuthorName(),
+            'body'        => $body,
+        ]);
+
+        // Record into the activity feed so the right-rail Activity tab
+        // surfaces comment posts alongside save / publish / lock events.
+        [$authorId, $authorName] = $this->currentAuthor();
+        Activity::create([
+            'page_id'     => $pageId,
+            'route_id'    => $this->routeId,
+            'verb'        => 'comment_added',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => ['block_id' => $blockId, 'comment_id' => $comment->id, 'body' => $body],
+        ]);
+
+        // Clear the compose form + drop any reply target so the next
+        // post defaults back to a new top-level thread.
+        $this->newCommentBody = '';
+        $this->replyingTo     = null;
+
+        $this->dispatch('page-studio:comment:added',
+            commentId: $comment->id,
+            blockId:   $blockId,
+            body:      $body,
+        );
+    }
+
+    /**
+     * Convenience wrapper · post a reply against an existing comment.
+     */
+    public function replyToComment(int $parentId, string $body): void
+    {
+        $parent = BlockComment::find($parentId);
+        if (! $parent) return;
+        // Replies anchor to the same block as the parent thread so a
+        // wire-level caller can't smuggle the reply onto a different
+        // block by passing a stale blockId.
+        $this->addComment($parent->block_id, $body, $parent->id);
+    }
+
+    public function resolveComment(int $id): void
+    {
+        $comment = BlockComment::find($id);
+        if (! $comment) return;
+        $comment->update([
+            'resolved'    => true,
+            'resolved_at' => now(),
+            'resolved_by' => auth()->id(),
+        ]);
+
+        [$authorId, $authorName] = $this->currentAuthor();
+        Activity::create([
+            'page_id'     => $comment->page_id,
+            'route_id'    => $this->routeId,
+            'verb'        => 'comment_resolved',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => ['block_id' => $comment->block_id, 'comment_id' => $comment->id],
+        ]);
+    }
+
+    public function reopenComment(int $id): void
+    {
+        $comment = BlockComment::find($id);
+        if (! $comment) return;
+        $comment->update([
+            'resolved'    => false,
+            'resolved_at' => null,
+            'resolved_by' => null,
+        ]);
+    }
+
+    /**
+     * Delete a comment · author-only for now (keep it permissive · a
+     * superuser policy can extend this later). Replies are not
+     * cascaded by the DB so we wipe them explicitly to avoid orphaned
+     * children pointing at a vanished parent.
+     */
+    public function deleteComment(int $id): void
+    {
+        $comment = BlockComment::find($id);
+        if (! $comment) return;
+        if ((int) $comment->author_id !== (int) auth()->id()) return;
+
+        BlockComment::where('parent_id', $comment->id)->delete();
+        $comment->delete();
+    }
+
+    /**
+     * Compose-form action · posts $newCommentBody against the
+     * currently selected block (or as a reply when $replyingTo is set).
+     * Returns early when nothing is selected so the Post button
+     * outside a selection is a no-op.
+     */
+    public function postCurrentComment(): void
+    {
+        $block = $this->selectedBlock();
+        if (! $block) return;
+        if ($this->replyingTo !== null) {
+            $this->replyToComment($this->replyingTo, $this->newCommentBody);
+            return;
+        }
+        $this->addComment((string) $block['id'], $this->newCommentBody);
+    }
+
+    public function startReply(int $parentId): void
+    {
+        $this->replyingTo = $parentId;
+    }
+
+    public function cancelReply(): void
+    {
+        $this->replyingTo = null;
+    }
+
+    public function showCommentsView(): void
+    {
+        $this->rightRailView = 'comments';
+    }
+
+    public function showSettingsView(): void
+    {
+        $this->rightRailView = 'settings';
+    }
+
+    /**
+     * Open comment threads on the current page grouped by block_id.
+     * Each top-level entry carries its nested replies in time order
+     * (oldest first) so the rail can render the conversation in
+     * authoring sequence.
+     *
+     * @return array<string, array<int, array<string, mixed>>>
+     */
+    #[Computed]
+    public function blockComments(): array
+    {
+        $pageId = $this->pageId ?? ($this->routeId !== null
+            ? Page::where('route_id', $this->routeId)->value('id')
+            : null);
+        if ($pageId === null) return [];
+
+        $rows = BlockComment::where('page_id', $pageId)
+            ->open()
+            ->orderBy('id')
+            ->get();
+
+        // Bucket replies under their parent · top-level first.
+        $byParent = [];
+        $tops = [];
+        foreach ($rows as $row) {
+            $shape = [
+                'id'          => (int) $row->id,
+                'block_id'    => (string) $row->block_id,
+                'parent_id'   => $row->parent_id ? (int) $row->parent_id : null,
+                'author_id'   => $row->author_id ? (int) $row->author_id : null,
+                'author_name' => $row->author_name,
+                'body'        => (string) $row->body,
+                'created_at'  => $row->created_at?->toIso8601String(),
+                'resolved'    => (bool) $row->resolved,
+                'replies'     => [],
+            ];
+            if ($row->parent_id) {
+                $byParent[(int) $row->parent_id][] = $shape;
+            } else {
+                $tops[] = $shape;
+            }
+        }
+
+        $grouped = [];
+        foreach ($tops as $top) {
+            $top['replies'] = $byParent[$top['id']] ?? [];
+            $grouped[$top['block_id']][] = $top;
+        }
+        return $grouped;
+    }
+
+    /**
+     * Lightweight open-count per block · keeps the indicator pip cheap
+     * by skipping the full thread payload when all the UI needs is a
+     * count for the badge.
+     *
+     * @return array<string, int>
+     */
+    #[Computed]
+    public function commentsCountByBlock(): array
+    {
+        $pageId = $this->pageId ?? ($this->routeId !== null
+            ? Page::where('route_id', $this->routeId)->value('id')
+            : null);
+        if ($pageId === null) return [];
+
+        return BlockComment::where('page_id', $pageId)
+            ->open()
+            ->selectRaw('block_id, count(*) as c')
+            ->groupBy('block_id')
+            ->pluck('c', 'block_id')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+    }
+
+    /**
+     * Total open comments on the page · used by the topbar badge.
+     */
+    #[Computed]
+    public function openCommentsCount(): int
+    {
+        return array_sum($this->commentsCountByBlock());
     }
 
     public function render()

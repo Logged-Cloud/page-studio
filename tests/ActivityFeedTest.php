@@ -55,13 +55,13 @@ it('publish() and unpublish() record their own verbs (no duplicate saved row)', 
     expect($verbs)->toBe(['published', 'unpublished']);
 });
 
-it('addComment writes a comment_added row with the block id in payload', function () {
+it('addComment hooks an activity row + the comment-added event', function () {
     afAuthAs(1, 'Alice');
     $page = afPage();
 
     $pb = new PageBuilder();
     $pb->mount(pageId: $page->id);
-    $pb->addComment('blk-1', 'Looks great!', 'Heading');
+    $pb->addComment('blk-1', 'Looks great!');
 
     $row = Activity::where('verb', 'comment_added')->first();
     expect($row)->not->toBeNull()
@@ -69,24 +69,24 @@ it('addComment writes a comment_added row with the block id in payload', functio
         ->and($row->payload['body'] ?? null)->toBe('Looks great!');
 });
 
-it('resolveComment writes a comment_resolved row referencing the original', function () {
+it('resolveComment hooks a comment_resolved activity row', function () {
     afAuthAs(1, 'Alice');
     $page = afPage();
 
     $pb = new PageBuilder();
     $pb->mount(pageId: $page->id);
-    $pb->addComment('blk-1', 'Needs work', 'Heading');
+    $pb->addComment('blk-1', 'Needs work');
+    $commentId = \LoggedCloud\PageStudio\Models\BlockComment::where('page_id', $page->id)->first()->id;
 
-    $original = Activity::where('verb', 'comment_added')->first();
     afAuthAs(2, 'Bob');
     $pb2 = new PageBuilder();
     $pb2->mount(pageId: $page->id);
-    $pb2->resolveComment($original->id);
+    $pb2->resolveComment($commentId);
 
     $row = Activity::where('verb', 'comment_resolved')->first();
     expect($row)->not->toBeNull()
         ->and($row->author_name)->toBe('Bob')
-        ->and($row->payload['resolved_id'] ?? null)->toBe($original->id);
+        ->and($row->payload['comment_id'] ?? null)->toBe($commentId);
 });
 
 it('activityFeed returns rows most-recent-first, capped at 30', function () {
@@ -153,7 +153,7 @@ it('ephemeral mode (no binding) writes no activity rows and returns an empty fee
     $pb->save();
     $pb->publish();
     $pb->unpublish();
-    $pb->addComment('blk-1', 'hi', 'Heading');
+    $pb->addComment('blk-1', 'hi');
 
     expect(Activity::count())->toBe(0)
         ->and($pb->activityFeed())->toBe([]);
