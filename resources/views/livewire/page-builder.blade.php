@@ -85,6 +85,30 @@
         </div>
     </div>
 
+    {{-- Email meta · subject / preheader / reply-to · shown in email mode --}}
+    @if ($emailMode && ! $previewMode)
+        <div class="ps-pb-email-meta">
+            <label class="ps-pb-email-meta-field">
+                <span>Subject</span>
+                <input type="text"
+                       wire:model.live.debounce.400ms="meta.subject"
+                       placeholder="Subject line shown in the inbox">
+            </label>
+            <label class="ps-pb-email-meta-field">
+                <span>Preheader</span>
+                <input type="text"
+                       wire:model.live.debounce.400ms="meta.preheader"
+                       placeholder="Preview snippet (hidden in the email body)">
+            </label>
+            <label class="ps-pb-email-meta-field">
+                <span>Reply to</span>
+                <input type="email"
+                       wire:model.live.debounce.400ms="meta.replyTo"
+                       placeholder="address@example.com">
+            </label>
+        </div>
+    @endif
+
     @if ($previewMode)
         <div class="ps-pb-preview-wrap"
              x-data="{ device: localStorage.getItem('psPbDevice') || 'desktop' }"
@@ -2334,6 +2358,43 @@
                     box-shadow: 0 4px 16px rgba(0,0,0,.3);
                 }
                 .ps-pb-empty { color: #888; font-style: italic; text-align: center; margin: 0; }
+
+                /* Email meta band · shown in email mode under the topbar */
+                .ps-pb-email-meta {
+                    display: grid;
+                    grid-template-columns: 1fr 1fr 1fr;
+                    gap: .65rem;
+                    padding: .65rem .85rem;
+                    background: rgba(255,255,255,.02);
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-email-meta-field {
+                    display: flex;
+                    flex-direction: column;
+                    gap: .2rem;
+                    font-size: .8rem;
+                }
+                .ps-pb-email-meta-field span {
+                    color: var(--ink-dim, #A3A099);
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                    font-size: .65rem;
+                }
+                .ps-pb-email-meta-field input {
+                    background: var(--surface, #16171a);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .25rem;
+                    padding: .35rem .55rem;
+                    font-size: .85rem;
+                    outline: none;
+                }
+                .ps-pb-email-meta-field input:focus {
+                    border-color: var(--accent, #2C66E8);
+                }
+                @media (max-width: 768px) {
+                    .ps-pb-email-meta { grid-template-columns: 1fr; gap: .4rem; }
+                }
 
                 /* In-page finder · Ctrl-F / '/' opens it */
                 .ps-pb-find-wrap { position: fixed; inset: 0; z-index: 600; }
