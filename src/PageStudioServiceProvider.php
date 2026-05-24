@@ -171,6 +171,7 @@ class PageStudioServiceProvider extends ServiceProvider
             Blocks\Builtin\ButtonBlock::class,
             Blocks\Builtin\ImageBlock::class,
             Blocks\Builtin\ListBlock::class,
+            Blocks\Builtin\TableBlock::class,
             Blocks\Builtin\QuoteBlock::class,
             Blocks\Builtin\CodeBlock::class,
             Blocks\Builtin\DividerBlock::class,

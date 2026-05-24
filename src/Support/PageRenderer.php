@@ -59,25 +59,59 @@ class PageRenderer
         // the {{ }} braces don't get escaped so the pattern still matches.
         $escaped = htmlspecialchars($text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
+        // Dots are allowed in token names so authors can drop deep references
+        // like `{{ user.email }}` or `{{ booking.customer.name }}` · the
+        // matching value is resolved via data_get so both flat-key contexts
+        // (`['user.email' => 'foo']`) and nested ones (`['user' => [...]]`)
+        // both work.
         return (string) preg_replace_callback(
-            '/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/',
+            '/\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/',
             function ($m) use ($context, $decorate) {
-                $name = $m[1];
-                if (! array_key_exists($name, $context)) {
-                    return $m[0];
-                }
-                $value = htmlspecialchars(
-                    (string) $context[$name],
-                    ENT_QUOTES | ENT_HTML5, 'UTF-8',
-                );
-                if (! $decorate) return $value;
+                $name  = $m[1];
+                $value = self::lookup($context, $name);
+                if ($value === self::MISSING) return $m[0];
+
+                $rendered = htmlspecialchars(self::stringify($value), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if (! $decorate) return $rendered;
                 return '<mark class="ps-var" data-var="'.$name.'" '
                     .'title="'.$name.'" '
                     .'style="background:color-mix(in srgb, #2C66E8 18%, transparent);color:#2C66E8;border-radius:.2rem;padding:0 .3rem;font-weight:600">'
-                    .$value.'</mark>';
+                    .$rendered.'</mark>';
             },
             $escaped,
         );
+    }
+
+    /** Sentinel for `lookup()` so callers can distinguish "missing" from "value is empty". */
+    private const MISSING = "\0__ps_missing__\0";
+
+    /**
+     * Look up a dotted name in the context. Checks both the flat key and a
+     * walked nested path. Returns MISSING if neither exists · used by the
+     * renderer to leave unsubstituted tokens visible to the author.
+     */
+    protected static function lookup(array $context, string $name): mixed
+    {
+        if (array_key_exists($name, $context)) {
+            return $context[$name];
+        }
+        $walked = data_get($context, $name, self::MISSING);
+        return $walked;
+    }
+
+    /**
+     * Render a value to a string for substitution · DateTimeInterface gets
+     * ATOM, arrays/objects get JSON, anything else falls through to (string).
+     */
+    protected static function stringify(mixed $value): string
+    {
+        if ($value === null)                      return '';
+        if (is_string($value))                    return $value;
+        if (is_bool($value))                      return $value ? 'true' : 'false';
+        if (is_scalar($value))                    return (string) $value;
+        if ($value instanceof \DateTimeInterface) return $value->format(DATE_ATOM);
+        if (is_object($value) && method_exists($value, '__toString')) return (string) $value;
+        return (string) json_encode($value);
     }
 
     /**
@@ -90,10 +124,11 @@ class PageRenderer
             return self::renderText($text, $context, true);
         }
         return (string) preg_replace_callback(
-            '/\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/',
-            fn ($m) => array_key_exists($m[1], $context)
-                ? (string) $context[$m[1]]
-                : $m[0],
+            '/\{\{\s*([A-Za-z_][A-Za-z0-9_.]*)\s*\}\}/',
+            function ($m) use ($context) {
+                $value = self::lookup($context, $m[1]);
+                return $value === self::MISSING ? $m[0] : self::stringify($value);
+            },
             $text,
         );
     }

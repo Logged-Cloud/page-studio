@@ -179,22 +179,85 @@ class PageBuilder extends Component
     {
         $out = [];
         foreach ($input as $key => $value) {
-            if (is_int($key) && is_array($value)) {
-                $name = (string) ($value['name'] ?? '');
-                if ($name === '') continue;
+            if (is_int($key) && is_array($value) && isset($value['name'])) {
+                // Already-shaped entry · keep verbatim.
                 $out[] = [
-                    'name'    => $name,
-                    'label'   => (string) ($value['label']   ?? $name),
+                    'name'    => (string) $value['name'],
+                    'label'   => (string) ($value['label']   ?? $value['name']),
                     'preview' => (string) ($value['preview'] ?? ''),
                 ];
-            } else {
-                // Flat shape · key IS the name, value is the preview.
-                $name = (string) $key;
-                if ($name === '') continue;
-                $out[] = ['name' => $name, 'label' => $name, 'preview' => (string) $value];
+                continue;
             }
+
+            $name = (string) $key;
+            if ($name === '') continue;
+
+            // Eloquent model · expose a root entry plus a dot-path entry per
+            // attribute. The renderer's substitute() walks data_get, so the
+            // author can type `{{ user.email }}` and get the leaf value.
+            if ($value instanceof \Illuminate\Database\Eloquent\Model) {
+                $out[] = $this->variableEntry($name, $name, $this->modelPreview($value));
+                foreach ($value->attributesToArray() as $col => $v) {
+                    if (is_scalar($v) || $v === null) {
+                        $out[] = $this->variableEntry(
+                            "$name.$col",
+                            $col,
+                            $this->scalarPreview($v),
+                        );
+                    }
+                }
+                continue;
+            }
+
+            if ($value instanceof \Illuminate\Support\Collection) {
+                $out[] = $this->variableEntry($name, $name, 'collection ('.$value->count().')');
+                continue;
+            }
+
+            if (is_array($value)) {
+                $out[] = $this->variableEntry($name, $name, 'array ('.count($value).')');
+                foreach ($value as $k => $v) {
+                    if (is_scalar($v) || $v === null) {
+                        $out[] = $this->variableEntry(
+                            "$name.$k",
+                            (string) $k,
+                            $this->scalarPreview($v),
+                        );
+                    }
+                }
+                continue;
+            }
+
+            $out[] = $this->variableEntry($name, $name, $this->scalarPreview($value));
         }
         return $out;
+    }
+
+    protected function variableEntry(string $name, string $label, string $preview): array
+    {
+        return ['name' => $name, 'label' => $label, 'preview' => $preview];
+    }
+
+    /**
+     * Best-effort human label for an Eloquent model shown next to the var
+     * chip · falls back to `Class #id` when no name-ish column is set.
+     */
+    protected function modelPreview(\Illuminate\Database\Eloquent\Model $m): string
+    {
+        // Eloquent's base __toString returns the JSON dump · skip past it
+        // and look for a sensible human label first.
+        foreach (['name', 'label', 'title', 'email'] as $candidate) {
+            $v = $m->getAttribute($candidate);
+            if (is_scalar($v) && $v !== '') return (string) $v;
+        }
+        return class_basename($m).' #'.($m->getKey() ?? '?');
+    }
+
+    protected function scalarPreview(mixed $v): string
+    {
+        if ($v === null)  return '';
+        if (is_bool($v))  return $v ? 'true' : 'false';
+        return (string) $v;
     }
 
     /**
