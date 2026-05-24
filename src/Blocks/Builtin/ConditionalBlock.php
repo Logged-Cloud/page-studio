@@ -77,4 +77,18 @@ class ConditionalBlock extends BlockType
 
         return $satisfied ? PageRenderer::renderChildrenForText($children, 'body', $context) : '';
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        $name  = trim((string) ($settings['variable'] ?? ''));
+        $value = $context[$name] ?? data_get($context, $name);
+
+        $satisfied = match ($settings['mode'] ?? 'truthy') {
+            'falsy'  => empty($value),
+            'equals' => (string) $value === (string) ($settings['compare'] ?? ''),
+            default  => (bool) $value,
+        };
+
+        return $satisfied ? PageRenderer::renderChildrenForMarkdown($children, 'body', $context) : '';
+    }
 }

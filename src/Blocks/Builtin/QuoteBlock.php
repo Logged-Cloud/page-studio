@@ -40,4 +40,19 @@ class QuoteBlock extends BlockType
         }
         return $body."\n";
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        $text = PageRenderer::substitute((string) ($settings['text'] ?? ''), $context);
+        $cite = (string) ($settings['cite'] ?? '');
+        $body = "> ".str_replace("\n", "\n> ", $text)."\n";
+        $body .= "\n";
+        if ($cite !== '') {
+            // Use the em-dash citation marker · the markdown surface is for
+            // export targets (docs sites, READMEs) where the dash reads
+            // naturally as a quote attribution.
+            $body .= "\u{2014} ".PageRenderer::substitute($cite, $context)."\n\n";
+        }
+        return $body;
+    }
 }

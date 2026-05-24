@@ -58,4 +58,9 @@ class SectionBlock extends BlockType
     {
         return PageRenderer::renderChildrenForText($children, 'body', $context);
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        return PageRenderer::renderChildrenForMarkdown($children, 'body', $context);
+    }
 }

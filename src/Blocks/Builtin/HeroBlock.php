@@ -91,4 +91,18 @@ class HeroBlock extends BlockType
         if ($label      !== '' && $href !== '') $out .= "{$label}: {$href}\n\n";
         return $out;
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        $heading    = PageRenderer::substitute((string) ($settings['heading']    ?? ''), $context);
+        $subheading = PageRenderer::substitute((string) ($settings['subheading'] ?? ''), $context);
+        $label      = PageRenderer::substitute((string) ($settings['cta_label']  ?? ''), $context);
+        $href       = PageRenderer::substitute((string) ($settings['cta_href']   ?? ''), $context);
+
+        $out = '';
+        if ($heading    !== '') $out .= "# {$heading}\n\n";
+        if ($subheading !== '') $out .= "{$subheading}\n\n";
+        if ($label      !== '' && $href !== '') $out .= "[{$label}]({$href})\n\n";
+        return $out;
+    }
 }

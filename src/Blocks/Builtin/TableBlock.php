@@ -61,4 +61,42 @@ class TableBlock extends BlockType
         }
         return $out."\n";
     }
+
+    public function renderMarkdown(array $settings, array $children, array $context): ?string
+    {
+        $html = PageRenderer::substitute((string) ($settings['html'] ?? ''), $context, false);
+        if ($html === '') return '';
+
+        $dom = new \DOMDocument();
+        libxml_use_internal_errors(true);
+        $dom->loadHTML('<?xml encoding="UTF-8"?><div>'.$html.'</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+        libxml_clear_errors();
+
+        $rows = [];
+        foreach ($dom->getElementsByTagName('tr') as $tr) {
+            $cells = [];
+            foreach ($tr->childNodes as $cell) {
+                $tag = strtolower($cell->nodeName ?? '');
+                if ($tag !== 'td' && $tag !== 'th') continue;
+                // Escape pipe so it doesn't break the markdown table grid.
+                $text = trim(preg_replace('/\s+/u', ' ', (string) ($cell->textContent ?? '')) ?? '');
+                $cells[] = str_replace('|', '\\|', $text);
+            }
+            if ($cells) $rows[] = $cells;
+        }
+
+        if (! $rows) return '';
+
+        $width = max(array_map('count', $rows));
+        $out   = '';
+        foreach ($rows as $i => $cells) {
+            // Pad short rows so every emitted line has the same column count.
+            $cells = array_pad($cells, $width, '');
+            $out  .= '| '.implode(' | ', $cells)." |\n";
+            if ($i === 0) {
+                $out .= '|'.str_repeat('---|', $width)."\n";
+            }
+        }
+        return $out."\n";
+    }
 }
