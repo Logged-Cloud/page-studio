@@ -402,6 +402,17 @@ class PageStudioServiceProvider extends ServiceProvider
         $page = Models\Page::where('route_id', $rd->id)->first();
         if (! $page) abort(404, 'No page authored for this route.');
 
+        // Drafts + scheduled-future pages stay hidden behind the auto-routes
+        // so the public URL never leaks them. Hosts that want to preview a
+        // draft can still bind the PageBuilder Livewire component to the
+        // pageId directly behind their own auth gate.
+        if (($page->status ?? 'draft') !== 'published') {
+            abort(404);
+        }
+        if ($page->publish_at !== null && $page->publish_at->isFuture()) {
+            abort(404);
+        }
+
         // Match positional route args back to the variable names declared on
         // the segments · Laravel hands them to us in the order they appear.
         $context = [];

@@ -81,12 +81,52 @@
                 {{ $previewMode ? '◀ Edit' : '👁 Preview' }}
             </button>
 
+            {{-- Status badge · Draft / Scheduled (publish_at in the future) / Published --}}
+            @php
+                $isScheduled = $status === 'published'
+                    && $publishAt
+                    && \Illuminate\Support\Carbon::parse($publishAt)->isFuture();
+                $badgeKind = $isScheduled ? 'scheduled' : ($status === 'published' ? 'published' : 'draft');
+                $badgeLabel = ['draft' => 'Draft', 'scheduled' => 'Scheduled', 'published' => 'Published'][$badgeKind];
+            @endphp
+            <span class="ps-pb-status-badge ps-pb-status-badge--{{ $badgeKind }}"
+                  title="Lifecycle state">{{ $badgeLabel }}</span>
+
+            {{-- Optional scheduled publish · datetime-local picker --}}
+            <label class="ps-pb-publish-at"
+                   title="Publish at (leave empty to publish immediately when you click Publish)">
+                <span class="ps-pb-publish-at-label">⏲</span>
+                <input type="datetime-local"
+                       wire:model.live="publishAt"
+                       class="ps-pb-publish-at-input">
+            </label>
+
+            @if ($status === 'published')
+                <button type="button"
+                        wire:click="unpublish"
+                        wire:target="unpublish"
+                        wire:loading.attr="disabled"
+                        class="ps-pb-btn">
+                    <span wire:loading.remove wire:target="unpublish">Unpublish</span>
+                    <span wire:loading wire:target="unpublish">Saving…</span>
+                </button>
+            @else
+                <button type="button"
+                        wire:click="publish"
+                        wire:target="publish"
+                        wire:loading.attr="disabled"
+                        class="ps-pb-btn ps-pb-btn--primary">
+                    <span wire:loading.remove wire:target="publish">Publish</span>
+                    <span wire:loading wire:target="publish">Saving…</span>
+                </button>
+            @endif
+
             <button type="button"
                     wire:click="save"
                     wire:target="save"
                     wire:loading.attr="disabled"
                     wire:loading.class="is-saving"
-                    class="ps-pb-btn ps-pb-btn--primary ps-pb-save-btn">
+                    class="ps-pb-btn ps-pb-save-btn">
                 <span wire:loading.remove wire:target="save">Save page</span>
                 <span wire:loading wire:target="save" class="ps-pb-save-busy">
                     <span class="ps-pb-spinner" aria-hidden="true"></span>
@@ -469,6 +509,83 @@
         </div>
     </div>
 
+    {{-- Compare-revisions overlay · two columns rendering picked revisions --}}
+    @if ($compareOpen)
+        @php
+            $cmp = $this->compareRevisions((int) $compareAId, (int) $compareBId);
+            $aPreview = $this->renderRevisionPreview($compareAId);
+            $bPreview = $this->renderRevisionPreview($compareBId);
+            $list = $this->revisionsList;
+        @endphp
+        <div class="ps-pb-compare-wrap"
+             @keydown.escape.window="$wire.closeCompare()">
+            <div class="ps-pb-compare-backdrop" wire:click="closeCompare"></div>
+            <div class="ps-pb-compare">
+                <header class="ps-pb-compare-head">
+                    <h3>Compare revisions</h3>
+                    <div class="ps-pb-compare-diff">
+                        @if ($cmp['a'] && $cmp['b'])
+                            <span>Blocks {{ $cmp['diff']['blocks'] >= 0 ? '+' : '' }}{{ $cmp['diff']['blocks'] }}</span>
+                            <span>Nodes {{ $cmp['diff']['nodes'] >= 0 ? '+' : '' }}{{ $cmp['diff']['nodes'] }}</span>
+                            <span>Edges {{ $cmp['diff']['edges'] >= 0 ? '+' : '' }}{{ $cmp['diff']['edges'] }}</span>
+                        @else
+                            <span>Pick two revisions to diff</span>
+                        @endif
+                    </div>
+                    <button type="button" wire:click="closeCompare" class="ps-pb-btn">Close</button>
+                </header>
+
+                <div class="ps-pb-compare-pickers">
+                    <label>
+                        <span>Revision A</span>
+                        <select wire:model.live="compareAId">
+                            @foreach ($list as $r)
+                                <option value="{{ $r['id'] }}">
+                                    #{{ $r['id'] }} · {{ $r['created_at_iso'] ? \Carbon\Carbon::parse($r['created_at_iso'])->diffForHumans() : '?' }}
+                                    · {{ $r['block_count'] }} blocks
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                    <label>
+                        <span>Revision B</span>
+                        <select wire:model.live="compareBId">
+                            @foreach ($list as $r)
+                                <option value="{{ $r['id'] }}">
+                                    #{{ $r['id'] }} · {{ $r['created_at_iso'] ? \Carbon\Carbon::parse($r['created_at_iso'])->diffForHumans() : '?' }}
+                                    · {{ $r['block_count'] }} blocks
+                                </option>
+                            @endforeach
+                        </select>
+                    </label>
+                </div>
+
+                <div class="ps-pb-compare-cols">
+                    <div class="ps-pb-compare-col">
+                        <div class="ps-pb-compare-col-head">A · #{{ $compareAId }}</div>
+                        <div class="ps-pb-compare-col-body">
+                            @if ($aPreview === '')
+                                <p class="ps-pb-empty">No content for this revision.</p>
+                            @else
+                                {!! $aPreview !!}
+                            @endif
+                        </div>
+                    </div>
+                    <div class="ps-pb-compare-col">
+                        <div class="ps-pb-compare-col-head">B · #{{ $compareBId }}</div>
+                        <div class="ps-pb-compare-col-body">
+                            @if ($bPreview === '')
+                                <p class="ps-pb-empty">No content for this revision.</p>
+                            @else
+                                {!! $bPreview !!}
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
+
     {{-- ─── Bottom drawer · node variable editor ───────────────────────────── --}}
     @if ($drawerOpen && ! $previewMode)
         <section class="ps-ne-drawer"
@@ -523,6 +640,13 @@
                             @endforeach
                         </div>
                     </details>
+                    <button type="button"
+                            wire:click="openCompare"
+                            class="ps-pb-btn"
+                            @if (count($this->revisionsList) < 2) disabled @endif
+                            title="Compare two revisions side-by-side">
+                        ⇆ Compare
+                    </button>
                     <button type="button" wire:click="tidy"
                             class="ps-pb-btn"
                             title="Auto-arrange nodes by dependency depth">
@@ -2234,6 +2358,40 @@
                     white-space: nowrap;
                     margin-right: .15rem;
                 }
+
+                /* Lifecycle badge · Draft (neutral) / Scheduled (amber) / Published (green) */
+                .ps-pb-status-badge {
+                    display: inline-flex; align-items: center;
+                    padding: .15rem .55rem;
+                    border-radius: 999px;
+                    font-size: .65rem;
+                    font-weight: 600;
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                    border: 1px solid transparent;
+                    line-height: 1.4;
+                }
+                .ps-pb-status-badge--draft     { background: rgba(163,160,153,.18); color: #A3A099; border-color: rgba(163,160,153,.3); }
+                .ps-pb-status-badge--scheduled { background: rgba(245,158,11,.18); color: #f59e0b; border-color: rgba(245,158,11,.35); }
+                .ps-pb-status-badge--published { background: rgba(34,197,94,.18);  color: #22c55e; border-color: rgba(34,197,94,.35); }
+                .ps-pb-publish-at {
+                    display: inline-flex; align-items: center; gap: .3rem;
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .35rem;
+                    padding: 0 .4rem;
+                    height: 1.85rem;
+                    font-size: .75rem;
+                    color: var(--ink-dim, #A3A099);
+                    background: transparent;
+                }
+                .ps-pb-publish-at-input {
+                    background: transparent;
+                    border: 0;
+                    color: var(--ink, #F0EDE5);
+                    font: inherit;
+                    font-size: .75rem;
+                    outline: none;
+                }
                 .ps-pb-rail-toggle {
                     background: transparent;
                     border: 1px solid var(--line, #3A3D40);
@@ -2765,6 +2923,76 @@
                     border-bottom: 1px solid var(--line, #3A3D40);
                 }
                 .ps-pb-cheats footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
+
+                /* Compare revisions · side-by-side overlay, mirrors the cheat-sheet shell */
+                .ps-pb-compare-wrap { position: fixed; inset: 0; z-index: 510; }
+                .ps-pb-compare-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.6); }
+                .ps-pb-compare {
+                    position: absolute; top: 50%; left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: var(--surface-2, #1E1F22);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .5rem;
+                    box-shadow: 0 16px 48px rgba(0,0,0,.6);
+                    display: flex; flex-direction: column;
+                    width: 92vw; max-width: 86rem;
+                    height: 86vh;
+                }
+                .ps-pb-compare-head {
+                    display: flex; align-items: center; gap: 1rem;
+                    padding: .85rem 1.25rem;
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-compare-head h3 { margin: 0; font-size: .95rem; }
+                .ps-pb-compare-diff {
+                    margin-left: auto; display: flex; gap: .85rem;
+                    font-family: ui-monospace, monospace; font-size: .8rem;
+                    color: var(--ink-dim, #A3A099);
+                }
+                .ps-pb-compare-pickers {
+                    display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;
+                    padding: .75rem 1.25rem;
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-compare-pickers label {
+                    display: flex; flex-direction: column; gap: .25rem;
+                    font-size: .7rem; color: var(--ink-dim, #A3A099);
+                    text-transform: uppercase; letter-spacing: .07em;
+                }
+                .ps-pb-compare-pickers select {
+                    background: var(--surface, #16171A);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .3rem;
+                    padding: .35rem .55rem;
+                    font: inherit; font-size: .8rem;
+                }
+                .ps-pb-compare-cols {
+                    flex: 1; min-height: 0;
+                    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+                }
+                .ps-pb-compare-col {
+                    display: flex; flex-direction: column;
+                    border-right: 1px solid var(--line, #3A3D40);
+                    min-height: 0;
+                }
+                .ps-pb-compare-col:last-child { border-right: 0; }
+                .ps-pb-compare-col-head {
+                    padding: .55rem 1rem;
+                    font-size: .75rem;
+                    font-family: ui-monospace, monospace;
+                    color: var(--ink-dim, #A3A099);
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                    background: rgba(255,255,255,.02);
+                }
+                .ps-pb-compare-col-body {
+                    flex: 1; min-height: 0;
+                    overflow-y: auto;
+                    padding: 1rem 1.25rem;
+                    background: #fff;
+                    color: #1a1a1a;
+                }
 
                 /* Revisions dropdown · sits in the drawer bar */
                 .ps-pb-revisions { position: relative; }
