@@ -1914,10 +1914,10 @@ class PageBuilder extends Component
 
     /**
      * Resolve the output socket list for a specific node · most node types
-     * just return the static schema, but `source.model_finder` with
-     * `expose_fields=true` expands one socket per column of the chosen
-     * model. The Blade canvas + the engine both consult this so the UI
-     * and the runtime stay in sync.
+     * just return the static schema, but any model-returning source with
+     * `expose_fields=true` (model_finder, auth_user) expands one socket
+     * per column of the chosen model. The Blade canvas + the engine both
+     * consult this so the UI and the runtime stay in sync.
      */
     public function outputsFor(array $node): array
     {
@@ -1925,14 +1925,15 @@ class PageBuilder extends Component
         $schema  = $library[$node['type'] ?? ''] ?? [];
         $outputs = $schema['outputs'] ?? [];
 
-        if (($node['type'] ?? '') === 'source.model_finder' && ! empty($node['settings']['expose_fields'])) {
-            $fields = \LoggedCloud\PageStudio\Support\ModelFields::for(
-                (string) ($node['settings']['model_class'] ?? ''),
-            );
-            if (! empty($fields)) {
-                $outputs = [];
-                foreach ($fields as $col => $type) {
-                    $outputs[$col] = ['label' => $col, 'type' => $type];
+        if (! empty($node['settings']['expose_fields'])) {
+            $class = $this->modelClassForNode($node);
+            if ($class !== '') {
+                $fields = \LoggedCloud\PageStudio\Support\ModelFields::for($class);
+                if (! empty($fields)) {
+                    $outputs = [];
+                    foreach ($fields as $col => $type) {
+                        $outputs[$col] = ['label' => $col, 'type' => $type];
+                    }
                 }
             }
         }
@@ -1941,15 +1942,35 @@ class PageBuilder extends Component
     }
 
     /**
-     * Server action backing the model-finder header button · flips the
-     * `expose_fields` flag for a node so the canvas + settings panel
-     * reflect the change without the user opening the settings drawer.
+     * Return the Eloquent model FQCN a given node introspects when
+     * `expose_fields` is on. `source.model_finder` carries the class in
+     * its `model_class` setting; `source.auth_user` falls back to the
+     * app's auth.providers.users.model so schema introspection works
+     * even when no one is logged in at design time.
+     */
+    protected function modelClassForNode(array $node): string
+    {
+        $type = $node['type'] ?? '';
+        if ($type === 'source.model_finder') {
+            return (string) ($node['settings']['model_class'] ?? '');
+        }
+        if ($type === 'source.auth_user') {
+            return (string) (config('auth.providers.users.model') ?? '');
+        }
+        return '';
+    }
+
+    /**
+     * Server action backing the model-finder + auth-user header button ·
+     * flips the `expose_fields` flag for a node so the canvas + settings
+     * panel reflect the change without the user opening the settings
+     * drawer.
      */
     public function toggleModelFields(string $nodeId): void
     {
         foreach ($this->nodes as $i => $node) {
             if ($node['id'] !== $nodeId) continue;
-            if ($node['type'] !== 'source.model_finder') return;
+            if (! in_array($node['type'], ['source.model_finder', 'source.auth_user'], true)) return;
             $this->pushHistory();
             $current = ! empty($node['settings']['expose_fields']);
             $this->nodes[$i]['settings']['expose_fields'] = ! $current;

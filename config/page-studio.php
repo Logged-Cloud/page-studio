@@ -135,7 +135,9 @@ return [
             'icon'     => '👤',
             'inputs'   => [],
             'outputs'  => ['user' => ['label' => 'User', 'type' => 'model']],
-            'settings' => [],
+            'settings' => [
+                'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => false, 'help' => 'Show one socket per column instead of a single user output.'],
+            ],
         ],
         'source.auth_id' => [
             'group'    => 'source',
