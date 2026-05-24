@@ -1403,59 +1403,6 @@ class PageBuilder extends Component
         }
     }
 
-    /**
-     * Record a comment against a block · the comment payload itself
-     * is stored on the Activity row so we don't need a separate table
-     * for the polling-only feed. A future host can ship a richer
-     * Comment model that hangs off the same payload shape.
-     */
-    public function addComment(string $blockId, string $body, ?string $blockLabel = null): void
-    {
-        if ($this->pageId === null && $this->routeId === null) return;
-        $body = trim($body);
-        if ($body === '') return;
-
-        [$authorId, $authorName] = $this->currentAuthor();
-        Activity::create([
-            'page_id'     => $this->pageId,
-            'route_id'    => $this->routeId,
-            'verb'        => 'comment_added',
-            'author_id'   => $authorId,
-            'author_name' => $authorName,
-            'payload'     => array_filter([
-                'block_id'    => $blockId,
-                'block_label' => $blockLabel,
-                'body'        => $body,
-            ], fn ($v) => $v !== null && $v !== ''),
-        ]);
-    }
-
-    /**
-     * Mark a previously-added comment resolved · the resolver is the
-     * person clicking the tick, not necessarily the original commenter.
-     */
-    public function resolveComment(int $activityId): void
-    {
-        if ($this->pageId === null && $this->routeId === null) return;
-
-        $original = Activity::find($activityId);
-        if (! $original || $original->verb !== 'comment_added') return;
-
-        [$authorId, $authorName] = $this->currentAuthor();
-        Activity::create([
-            'page_id'     => $this->pageId,
-            'route_id'    => $this->routeId,
-            'verb'        => 'comment_resolved',
-            'author_id'   => $authorId,
-            'author_name' => $authorName,
-            'payload'     => array_filter([
-                'block_id'    => $original->payload['block_id']    ?? null,
-                'block_label' => $original->payload['block_label'] ?? null,
-                'resolved_id' => $activityId,
-            ], fn ($v) => $v !== null && $v !== ''),
-        ]);
-    }
-
     // ─── Collaboration · block locks, presence, activity feed ───────────
     //
     // All three layers run polling-only (no Echo / Reverb) so the package
@@ -1475,13 +1422,11 @@ class PageBuilder extends Component
         $user = auth()->user();
         if (! $user) return [null, 'Anonymous'];
 
-        $id   = $user->getKey();
-        // Best-effort name resolution · most Laravel User models expose
-        // `name`, but the Authenticatable contract only guarantees an
-        // identifier. Fall back to email, then to the id.
-        $name = $user->name
-            ?? $user->email
-            ?? ('User '.$id);
+        // Authenticatable contract guarantees getAuthIdentifier · use that
+        // instead of getKey so GenericUser + test-only auth shapes also
+        // resolve cleanly.
+        $id = method_exists($user, 'getAuthIdentifier') ? $user->getAuthIdentifier() : ($user->id ?? null);
+        $name = ($user->name ?? null) ?: ($user->email ?? null) ?: ('User '.($id ?? '?'));
         return [$id, (string) $name];
     }
 
@@ -2126,6 +2071,18 @@ class PageBuilder extends Component
             'body'        => $body,
         ]);
 
+        // Record into the activity feed so the right-rail Activity tab
+        // surfaces comment posts alongside save / publish / lock events.
+        [$authorId, $authorName] = $this->currentAuthor();
+        Activity::create([
+            'page_id'     => $pageId,
+            'route_id'    => $this->routeId,
+            'verb'        => 'comment_added',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => ['block_id' => $blockId, 'comment_id' => $comment->id, 'body' => $body],
+        ]);
+
         // Clear the compose form + drop any reply target so the next
         // post defaults back to a new top-level thread.
         $this->newCommentBody = '';
@@ -2159,6 +2116,16 @@ class PageBuilder extends Component
             'resolved'    => true,
             'resolved_at' => now(),
             'resolved_by' => auth()->id(),
+        ]);
+
+        [$authorId, $authorName] = $this->currentAuthor();
+        Activity::create([
+            'page_id'     => $comment->page_id,
+            'route_id'    => $this->routeId,
+            'verb'        => 'comment_resolved',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => ['block_id' => $comment->block_id, 'comment_id' => $comment->id],
         ]);
     }
 
