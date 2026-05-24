@@ -75,6 +75,18 @@ abstract class BlockType
     abstract public function render(array $settings, array $children, array $context, bool $decorate = false): string;
 
     /**
+     * Email-specific renderer · return a nested-table HTML string here for
+     * blocks whose default `render()` uses CSS features email clients
+     * don't honour (grid, flex, color-mix). Return null to fall back to
+     * the regular render. The page-builder calls this path via
+     * `PageRenderer::renderForEmail($blocks, $context)`.
+     */
+    public function renderEmail(array $settings, array $children, array $context, bool $decorate = false): ?string
+    {
+        return null;
+    }
+
+    /**
      * Library entry · palette renderer + page builder schema lookup read
      * this exact shape from `config('page-studio.blocks')`.
      */

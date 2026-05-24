@@ -11,9 +11,10 @@ class ColumnsBlock extends BlockType
     public static function label(): string { return '2 Columns'; }
     public static function icon(): string  { return '⊟'; }
     public static function group(): string { return 'layout'; }
-    // Uses CSS grid · Outlook + most Gmail variants flat-stack it. Hide
-    // from the palette when the editor is in email mode.
-    public static function emailSafe(): bool { return false; }
+    // The default render uses CSS grid (poor email-client support) but
+    // `renderEmail()` below emits a nested table that Outlook + Gmail
+    // honour cleanly · safe to leave in the email-mode palette.
+    public static function emailSafe(): bool { return true; }
 
     public static function slots(): array
     {
@@ -51,6 +52,33 @@ class ColumnsBlock extends BlockType
             '<div style="display:grid;grid-template-columns:%s;gap:%s;margin:.65em 0">'
                 .'<div>%s</div><div>%s</div></div>',
             $grid, $gap, $left, $right,
+        );
+    }
+
+    public function renderEmail(array $settings, array $children, array $context, bool $decorate = false): ?string
+    {
+        $ratios = [
+            '1-1' => ['50%', '50%'],
+            '1-2' => ['33%', '67%'],
+            '2-1' => ['67%', '33%'],
+        ];
+        [$leftW, $rightW] = $ratios[$settings['ratio'] ?? '1-1'] ?? ['50%', '50%'];
+        $gap = match ($settings['gap'] ?? 'md') { 'sm' => 4, 'lg' => 24, default => 12 };
+        $half = (int) round($gap / 2);
+
+        $left  = PageRenderer::renderChildrenForEmail($children, 'left',  $context, $decorate);
+        $right = PageRenderer::renderChildrenForEmail($children, 'right', $context, $decorate);
+
+        // Nested table · the canonical email-safe column layout. role +
+        // border attrs neutralise Outlook + Apple Mail's default styling.
+        return sprintf(
+            '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0;border-collapse:collapse">'
+                .'<tr>'
+                    .'<td width="%1$s" valign="top" style="padding-right:%3$dpx">%4$s</td>'
+                    .'<td width="%2$s" valign="top" style="padding-left:%3$dpx">%5$s</td>'
+                .'</tr>'
+            .'</table>',
+            $leftW, $rightW, $half, $left, $right,
         );
     }
 }
