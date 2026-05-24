@@ -20,6 +20,23 @@ class SourceAuthUserNode extends NodeType
         ];
     }
 
+    public function dynamicOutputs(array $node): ?array
+    {
+        if (empty($node['settings']['expose_fields'])) return null;
+
+        $class = (string) (config('auth.providers.users.model') ?? '');
+        if ($class === '') return null;
+
+        $fields = \LoggedCloud\PageStudio\Support\ModelFields::for($class);
+        if (empty($fields)) return null;
+
+        $outputs = [];
+        foreach ($fields as $col => $type) {
+            $outputs[$col] = ['label' => $col, 'type' => $type];
+        }
+        return $outputs;
+    }
+
     public function evaluate(array $inputs, array $settings, array $context): array
     {
         $user   = auth()->check() ? auth()->user() : null;

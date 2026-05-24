@@ -1913,51 +1913,35 @@ class PageBuilder extends Component
     }
 
     /**
-     * Resolve the output socket list for a specific node · most node types
-     * just return the static schema, but any model-returning source with
-     * `expose_fields=true` (model_finder, auth_user) expands one socket
-     * per column of the chosen model. The Blade canvas + the engine both
-     * consult this so the UI and the runtime stay in sync.
+     * Resolve the output socket list for a specific node. The default is
+     * the static schema declared in `page-studio.nodes`; a NodeType class
+     * can override `dynamicOutputs($node)` to expand or replace it based
+     * on per-instance settings (e.g. one socket per column when an
+     * `expose_fields` flag is on). The Blade canvas + the engine both
+     * consult this so the UI and runtime stay in sync.
      */
     public function outputsFor(array $node): array
     {
+        $type    = $node['type'] ?? '';
         $library = config('page-studio.nodes', []);
-        $schema  = $library[$node['type'] ?? ''] ?? [];
+        $schema  = $library[$type] ?? [];
         $outputs = $schema['outputs'] ?? [];
 
-        if (! empty($node['settings']['expose_fields'])) {
-            $class = $this->modelClassForNode($node);
-            if ($class !== '') {
-                $fields = \LoggedCloud\PageStudio\Support\ModelFields::for($class);
-                if (! empty($fields)) {
-                    $outputs = [];
-                    foreach ($fields as $col => $type) {
-                        $outputs[$col] = ['label' => $col, 'type' => $type];
-                    }
+        $class = $schema['class'] ?? \LoggedCloud\PageStudio\Nodes\NodeRegistry::find($type);
+        if ($class && class_exists($class) && is_subclass_of($class, \LoggedCloud\PageStudio\Nodes\NodeType::class)) {
+            try {
+                $instance = new $class();
+                $dynamic  = $instance->dynamicOutputs($node);
+                if (is_array($dynamic) && ! empty($dynamic)) {
+                    return $dynamic;
                 }
+            } catch (\Throwable) {
+                // Fall through to the static schema on any error so a
+                // broken dynamicOutputs() doesn't strand the canvas.
             }
         }
 
         return $outputs;
-    }
-
-    /**
-     * Return the Eloquent model FQCN a given node introspects when
-     * `expose_fields` is on. `source.model_finder` carries the class in
-     * its `model_class` setting; `source.auth_user` falls back to the
-     * app's auth.providers.users.model so schema introspection works
-     * even when no one is logged in at design time.
-     */
-    protected function modelClassForNode(array $node): string
-    {
-        $type = $node['type'] ?? '';
-        if ($type === 'source.model_finder') {
-            return (string) ($node['settings']['model_class'] ?? '');
-        }
-        if ($type === 'source.auth_user') {
-            return (string) (config('auth.providers.users.model') ?? '');
-        }
-        return '';
     }
 
     /**

@@ -23,6 +23,22 @@ class SourceModelFinderNode extends NodeType
         ];
     }
 
+    public function dynamicOutputs(array $node): ?array
+    {
+        if (empty($node['settings']['expose_fields'])) return null;
+
+        $fields = \LoggedCloud\PageStudio\Support\ModelFields::for(
+            (string) ($node['settings']['model_class'] ?? ''),
+        );
+        if (empty($fields)) return null;
+
+        $outputs = [];
+        foreach ($fields as $col => $type) {
+            $outputs[$col] = ['label' => $col, 'type' => $type];
+        }
+        return $outputs;
+    }
+
     public function evaluate(array $inputs, array $settings, array $context): array
     {
         $class  = trim((string) ($settings['model_class'] ?? ''));

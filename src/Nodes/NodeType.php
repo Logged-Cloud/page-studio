@@ -70,6 +70,26 @@ abstract class NodeType
     abstract public function evaluate(array $inputs, array $settings, array $context): array;
 
     /**
+     * Optional hook for nodes whose output sockets depend on their
+     * settings (e.g. a "schema reader" that exposes one socket per column
+     * of a chosen model, or a "CSV reader" that exposes one socket per
+     * column of a chosen file). Return `null` to keep the static
+     * `outputs()` shape, or an array keyed by socket name with the same
+     * shape as `outputs()` to replace it.
+     *
+     * The Blade canvas + the settings panel both consult this via
+     * `PageBuilder::outputsFor($node)`, so the moment a setting flips
+     * the canvas + the engine pick up the new socket list.
+     *
+     * @param array<string, mixed> $node
+     * @return array<string, array{label?: string, type?: string}>|null
+     */
+    public function dynamicOutputs(array $node): ?array
+    {
+        return null;
+    }
+
+    /**
      * Return the config-shape the rest of the studio (palette renderer,
      * canvas, engine fallbacks) reads from `page-studio.nodes`. The
      * `class` key lets the engine round-trip back to the implementation.
