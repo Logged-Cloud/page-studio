@@ -1935,9 +1935,13 @@ class PageBuilder extends Component
                 if (is_array($dynamic) && ! empty($dynamic)) {
                     return $dynamic;
                 }
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
                 // Fall through to the static schema on any error so a
                 // broken dynamicOutputs() doesn't strand the canvas.
+                // Log so a third-party node implementer can find the bug.
+                if (function_exists('logger')) {
+                    logger()->debug('page-studio: dynamicOutputs() threw for '.$class.' · '.$e->getMessage());
+                }
             }
         }
 
