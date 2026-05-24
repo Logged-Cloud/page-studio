@@ -52,7 +52,8 @@ All four features ship out of the box on v2.2+ · short-poll based (~8s heartbea
 - [Model discovery](#model-discovery)
 - [Disabling parts of the editor](#disabling-parts-of-the-editor)
 - [Testing](#testing)
-- [License](#license)
+- [License](#license) · what's permitted today, two-year MIT conversion
+- [How page-studio compares](docs/comparison.md) · vs. Filament, Statamic, Gutenberg, Builder.io and friends
 
 ---
 
@@ -899,6 +900,23 @@ The `page-studio-lab` consumer app ships **20 Dusk tests** that drive Selenium a
 
 ## License
 
-Fair Source License 1.1 ([FSL-1.1-MIT](LICENSE)). Free for internal use, education, research, and professional-services work. Reselling the package as a competing product or service is not permitted. Converts to MIT two years after the release date.
+Fair Source License 1.1 ([FSL-1.1-MIT](LICENSE)). Each release converts to plain MIT two years after its publication date · the licence is time-fused, not a perpetual restriction.
 
-If you're a company that wants to use the studio outside the permitted purposes today, get in touch about a commercial licence.
+### What you can do without asking
+
+- **Ship it inside your own product.** SaaS, internal app, client work, agency builds. The studio doesn't care whether the host app is paid, free, or internal-only.
+- **Modify it.** Fork, patch, override views and components, extend the block / node / template registries. Contribute fixes back if you're feeling generous.
+- **Use it in education and research.** Teach with it, write papers about it, demo it at conferences, evaluate it on a vendor shortlist.
+- **Charge clients for setup, integration, and ongoing professional services.** Agency or freelancer work that wraps the studio is in scope.
+
+### What needs a commercial licence
+
+One narrow line: **don't repackage the studio itself as a competing product**. Concretely, you can't take the source, wrap a UI around it, and resell *that* as a hosted page builder, headless CMS, or competing developer tool. If you're not sure whether your use case crosses the line, the answer is almost always "you're fine", but [reach out](mailto:charles@mybookingrewards.com) and we'll confirm in writing.
+
+### Two-year MIT conversion
+
+Every tagged release carries a "convert on" date two years out. Once that date passes, that release is MIT licensed regardless of what happens to the project. The most you ever wait for an MIT version of any feature in this repo is two years.
+
+### Comparison with alternatives
+
+`docs/comparison.md` walks through where page-studio sits in the page-builder / headless-CMS landscape, what it gives up in exchange for fitting in a Composer require, and where another tool would be the better choice. See **[docs/comparison.md](docs/comparison.md)**.
