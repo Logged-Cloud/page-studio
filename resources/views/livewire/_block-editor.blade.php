@@ -51,10 +51,26 @@
                     wire:click.stop="moveSibling(@js($parentPath), {{ $slotJson }}, {{ $index }}, 1)"
                     title="Move down">↓</button>
             <button type="button"
+                    wire:click.stop="$wire.selectBlock(@js($path)); $wire.showCommentsView()"
+                    title="Comment on this block">💬</button>
+            <button type="button"
                     wire:click.stop="removeBlock(@js($path))"
                     class="ps-pb-block-danger" title="Delete">✕</button>
         </div>
     </div>
+
+    {{-- Indicator pip · shown when there's at least one open comment on
+         this block. Clicking selects the block + flips the right rail to
+         the thread view so the reviewer can read the conversation. --}}
+    @php $openCount = $this->commentsCountByBlock[$block['id']] ?? 0; @endphp
+    @if ($openCount > 0)
+        <button type="button"
+                class="ps-pb-block-comment-pip"
+                wire:click.stop="$wire.selectBlock(@js($path)); $wire.showCommentsView()"
+                title="{{ $openCount }} open {{ $openCount === 1 ? 'comment' : 'comments' }}">
+            {{ $openCount }}
+        </button>
+    @endif
 
     @if (! empty($schema['slots']))
         {{-- Layout container · slots are drop targets that hold nested blocks. --}}

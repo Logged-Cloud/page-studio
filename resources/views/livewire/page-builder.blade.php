@@ -96,6 +96,20 @@
                 ★ Library
             </button>
 
+            {{-- Comments overview · jumps the right rail to the thread
+                 view. Only shown when the page is bound (pageId or
+                 routeId · ephemeral mode has no DB row to anchor to). --}}
+            @if ($pageId !== null || $routeId !== null)
+                @php $openCount = $this->openCommentsCount; @endphp
+                <button type="button"
+                        wire:click="showCommentsView"
+                        class="ps-pb-btn ps-pb-comments-btn"
+                        :class="$wire.rightRailView === 'comments' ? 'is-active' : ''"
+                        title="Review comments on this page">
+                    💬 {{ $openCount }}
+                </button>
+            @endif
+
             @if ($this->nodeEditorEnabled())
                 <button type="button" wire:click="toggleDrawer"
                         class="ps-pb-btn ps-pb-nodes-btn"
@@ -383,23 +397,38 @@
                 </div>
             </main>
 
-            {{-- ─── RIGHT · settings + activity panel ─── --}}
+            {{-- ─── RIGHT · settings + comments + activity panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--right"
                    x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId || rightTab !== 'settings')" x-cloak>
 
-                {{-- Rail tab strip · the Settings tab keeps the existing
-                     editing UX, the Activity tab swaps in the polling feed.
-                     Comments tab is reserved for a future PR. --}}
+                {{-- Tab strip · Settings / Comments / Activity all share the
+                     rail. Selecting a non-Settings tab keeps the rail open
+                     even when no block is selected. --}}
                 <div class="ps-pb-rail-tab-strip">
                     <button type="button"
                             class="ps-pb-rail-tab"
                             :class="rightTab === 'settings' ? 'is-active' : ''"
                             @click="rightTab = 'settings'">Settings</button>
+                    @if ($pageId !== null || $routeId !== null)
+                        <button type="button"
+                                class="ps-pb-rail-tab"
+                                :class="rightTab === 'comments' ? 'is-active' : ''"
+                                @click="rightTab = 'comments'">
+                            💬 Comments
+                            @if ($this->openCommentsCount > 0)
+                                <span class="ps-pb-rail-tab-pip">{{ $this->openCommentsCount }}</span>
+                            @endif
+                        </button>
+                    @endif
                     <button type="button"
                             class="ps-pb-rail-tab"
                             :class="rightTab === 'activity' ? 'is-active' : ''"
                             @click="rightTab = 'activity'">Activity</button>
                 </div>
+
+                <section class="ps-pb-section" x-show="rightTab === 'comments'" x-cloak>
+                    @include('page-studio::livewire._comments-panel')
+                </section>
 
                 <section class="ps-pb-section" x-show="rightTab === 'activity'" x-cloak>
                     <h3>Activity</h3>
@@ -2893,6 +2922,160 @@
                     padding: 0 .25rem; cursor: pointer; font: inherit; font-size: .75rem;
                 }
                 .ps-pb-block-danger { color: #fee2e2 !important; }
+
+                /* Block comment pip · small red circle anchored top-right
+                   of the block-wrap. Always visible when an open comment
+                   exists, regardless of hover / selection state. */
+                .ps-pb-block-comment-pip {
+                    position: absolute;
+                    top: -.4rem;
+                    right: -.4rem;
+                    min-width: 1rem;
+                    height: 1rem;
+                    padding: 0 .3rem;
+                    border-radius: 1rem;
+                    background: #DC2626;
+                    color: #fff;
+                    border: 0;
+                    font-size: .65rem;
+                    line-height: 1rem;
+                    font-weight: 600;
+                    cursor: pointer;
+                    z-index: 5;
+                    box-shadow: 0 1px 2px rgba(0,0,0,.25);
+                }
+                .ps-pb-block-comment-pip:hover { background: #B91C1C; }
+
+                /* Right-rail tabs · flip between Settings and Comments. */
+                .ps-pb-rail-tabs {
+                    display: flex;
+                    gap: .25rem;
+                    padding: .5rem .5rem 0;
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-rail-tab {
+                    background: transparent;
+                    color: var(--muted, #999);
+                    border: 0;
+                    padding: .4rem .6rem;
+                    font: inherit;
+                    font-size: .75rem;
+                    cursor: pointer;
+                    border-bottom: 2px solid transparent;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .35rem;
+                }
+                .ps-pb-rail-tab:hover { color: var(--ink, #F0EDE5); }
+                .ps-pb-rail-tab.is-active {
+                    color: var(--ink, #F0EDE5);
+                    border-bottom-color: var(--accent, #2C66E8);
+                }
+                .ps-pb-rail-tab-pip {
+                    display: inline-block;
+                    min-width: 1.1rem;
+                    padding: 0 .3rem;
+                    border-radius: 1rem;
+                    background: #DC2626;
+                    color: #fff;
+                    font-size: .6rem;
+                    line-height: 1rem;
+                    font-weight: 600;
+                }
+
+                /* Comments panel · threads + compose form share the rail. */
+                .ps-pb-comments-section { padding-bottom: 1rem; }
+                .ps-pb-comment-thread {
+                    margin-bottom: .75rem;
+                    padding: .35rem 0;
+                    border-bottom: 1px solid rgba(255,255,255,.04);
+                }
+                .ps-pb-comment-thread.is-selected-block {
+                    border-color: rgba(44,102,232,.35);
+                }
+                .ps-pb-comment-row {
+                    padding: .4rem .5rem;
+                    border-radius: .3rem;
+                    background: rgba(255,255,255,.03);
+                    margin-bottom: .35rem;
+                }
+                .ps-pb-comment-reply {
+                    margin-left: 1.25rem;
+                    background: rgba(255,255,255,.02);
+                    border-left: 2px solid var(--line, #3A3D40);
+                }
+                .ps-pb-comment-head {
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: baseline;
+                    gap: .5rem;
+                    margin-bottom: .2rem;
+                }
+                .ps-pb-comment-author { font-weight: 600; font-size: .8rem; }
+                .ps-pb-comment-time { font-size: .65rem; color: var(--muted, #999); }
+                .ps-pb-comment-body {
+                    font-size: .8rem;
+                    line-height: 1.4;
+                    white-space: pre-wrap;
+                    word-break: break-word;
+                }
+                .ps-pb-comment-actions {
+                    display: flex;
+                    gap: .25rem;
+                    margin-top: .35rem;
+                }
+                .ps-pb-comment-action {
+                    background: transparent;
+                    border: 0;
+                    color: var(--muted, #999);
+                    cursor: pointer;
+                    font: inherit;
+                    font-size: .7rem;
+                    padding: .15rem .3rem;
+                    border-radius: .2rem;
+                }
+                .ps-pb-comment-action:hover {
+                    color: var(--ink, #F0EDE5);
+                    background: rgba(255,255,255,.05);
+                }
+                .ps-pb-comment-danger:hover { color: #fee2e2; background: rgba(220,38,38,.15); }
+                .ps-pb-comment-compose {
+                    margin-top: .75rem;
+                    padding-top: .5rem;
+                    border-top: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-comment-compose textarea {
+                    width: 100%;
+                    background: rgba(0,0,0,.2);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .3rem;
+                    padding: .4rem;
+                    font: inherit;
+                    font-size: .8rem;
+                    resize: vertical;
+                    margin-bottom: .4rem;
+                }
+                .ps-pb-comment-replying {
+                    font-size: .7rem;
+                    color: var(--muted, #999);
+                    margin-bottom: .35rem;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                }
+                .ps-pb-comment-block-jump {
+                    background: transparent;
+                    border: 1px dashed var(--line, #3A3D40);
+                    color: var(--muted, #999);
+                    padding: .25rem .4rem;
+                    font: inherit;
+                    font-size: .7rem;
+                    border-radius: .25rem;
+                    cursor: pointer;
+                    margin-bottom: .3rem;
+                }
+                .ps-pb-comments-btn.is-active { color: var(--accent, #2C66E8); }
 
                 /* Drop indicator */
                 .ps-pb-drop-line {
