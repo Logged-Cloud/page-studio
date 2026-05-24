@@ -19,6 +19,7 @@
     data-slot="{{ $slot === null ? '' : $slot }}"
     data-index="{{ $index }}"
     @click.stop="$wire.selectBlock(@js($path))"
+    @contextmenu.prevent.stop="openBlockCtxMenu($event, @js($path))"
     draggable="true"
     @dragstart.stop="onBlockDragStart($event, @js($path))"
     @dragover.prevent.stop="onBlockDragOver($event, @js($parentPath), {{ $slotJson }}, {{ $index }})"
