@@ -17,6 +17,12 @@ class PageRenderer
      */
     public static function render(array $blocks, array $context = [], bool $decorate = false): string
     {
+        return self::cached('html', $blocks, $context, $decorate, fn () => self::renderUncached($blocks, $context, $decorate));
+    }
+
+    /** Cache-less variant · child renders go straight here so a single top-level call yields one cache lookup. */
+    protected static function renderUncached(array $blocks, array $context, bool $decorate): string
+    {
         $out = '';
         foreach ($blocks as $block) {
             $out .= self::renderBlock($block, $context, $decorate);
@@ -140,7 +146,7 @@ class PageRenderer
     public static function renderChildren(array $children, string $slot, array $context, bool $decorate): string
     {
         $kids = $children[$slot] ?? [];
-        return is_array($kids) ? self::render($kids, $context, $decorate) : '';
+        return is_array($kids) ? self::renderUncached($kids, $context, $decorate) : '';
     }
 
     /**
@@ -149,6 +155,11 @@ class PageRenderer
      * falls back to the regular `render()` when no override exists.
      */
     public static function renderForEmail(array $blocks, array $context = [], bool $decorate = false): string
+    {
+        return self::cached('email', $blocks, $context, $decorate, fn () => self::renderForEmailUncached($blocks, $context, $decorate));
+    }
+
+    protected static function renderForEmailUncached(array $blocks, array $context, bool $decorate): string
     {
         $out = '';
         foreach ($blocks as $block) {
@@ -183,7 +194,7 @@ class PageRenderer
     public static function renderChildrenForEmail(array $children, string $slot, array $context, bool $decorate): string
     {
         $kids = $children[$slot] ?? [];
-        return is_array($kids) ? self::renderForEmail($kids, $context, $decorate) : '';
+        return is_array($kids) ? self::renderForEmailUncached($kids, $context, $decorate) : '';
     }
 
     /**
@@ -193,6 +204,11 @@ class PageRenderer
      * regular render output.
      */
     public static function renderForText(array $blocks, array $context = []): string
+    {
+        return self::cached('text', $blocks, $context, false, fn () => self::renderForTextUncached($blocks, $context));
+    }
+
+    protected static function renderForTextUncached(array $blocks, array $context): string
     {
         $out = '';
         foreach ($blocks as $block) {
@@ -233,7 +249,7 @@ class PageRenderer
     public static function renderChildrenForText(array $children, string $slot, array $context): string
     {
         $kids = $children[$slot] ?? [];
-        return is_array($kids) ? self::renderForText($kids, $context) : '';
+        return is_array($kids) ? self::renderForTextUncached($kids, $context) : '';
     }
 
     /**
@@ -244,6 +260,11 @@ class PageRenderer
      * `renderForText` does so the output is safe to drop into a `.md` file.
      */
     public static function renderForMarkdown(array $blocks, array $context = []): string
+    {
+        return self::cached('markdown', $blocks, $context, false, fn () => self::renderForMarkdownUncached($blocks, $context));
+    }
+
+    protected static function renderForMarkdownUncached(array $blocks, array $context): string
     {
         $out = '';
         foreach ($blocks as $block) {
@@ -285,13 +306,63 @@ class PageRenderer
     public static function renderChildrenForMarkdown(array $children, string $slot, array $context): string
     {
         $kids = $children[$slot] ?? [];
-        return is_array($kids) ? self::renderForMarkdown($kids, $context) : '';
+        return is_array($kids) ? self::renderForMarkdownUncached($kids, $context) : '';
     }
 
     /**
      * Strip HTML to readable plain text · used as the fallback shape when a
      * block doesn't ship its own `renderText()`.
      */
+    /**
+     * Wrap a top-level render in Cache::remember when the render cache is
+     * enabled and we're not in editor decorate mode. The cache key folds
+     * the render mode, blocks, and context into a sha1 so any change to
+     * any of those inputs misses the cache and recomputes. Editor mode
+     * (`$decorate === true`) always bypasses · the canvas is live and
+     * caching it would only burn memory.
+     */
+    protected static function cached(string $mode, array $blocks, array $context, bool $decorate, \Closure $compute): string
+    {
+        if ($decorate || ! self::cacheEnabled()) {
+            return $compute();
+        }
+
+        $key   = self::cacheKey($mode, $blocks, $context);
+        $store = self::cacheStore();
+        $ttl   = self::cacheTtl();
+
+        return $store
+            ? \Illuminate\Support\Facades\Cache::store($store)->remember($key, $ttl, $compute)
+            : \Illuminate\Support\Facades\Cache::remember($key, $ttl, $compute);
+    }
+
+    protected static function cacheEnabled(): bool
+    {
+        if (! function_exists('config')) return false;
+        return (bool) config('page-studio.render_cache.enabled', false);
+    }
+
+    protected static function cacheStore(): ?string
+    {
+        return function_exists('config') ? config('page-studio.render_cache.store') : null;
+    }
+
+    protected static function cacheTtl(): int
+    {
+        return function_exists('config') ? (int) config('page-studio.render_cache.ttl', 3600) : 3600;
+    }
+
+    protected static function cacheKey(string $mode, array $blocks, array $context): string
+    {
+        $payload = json_encode([
+            'm' => $mode,
+            'b' => $blocks,
+            'c' => $context,
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+
+        return 'page-studio:render:'.$mode.':'.sha1($payload ?: $mode);
+    }
+
     public static function stripToText(string $html): string
     {
         $text = html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');

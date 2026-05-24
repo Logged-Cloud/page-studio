@@ -6,6 +6,20 @@ return [
     'connection'   => null,
     'route_prefix' => 'studio/preview',
 
+    /*
+     * Render-result cache · PageRenderer::render() (and the email/text/markdown
+     * counterparts) wraps the top-level render in Cache::remember, keyed by a
+     * sha1 of the block tree + context + render mode. Disabled by default so
+     * existing apps don't change behaviour. Turn on for the public-facing page
+     * render path where blocks change rarely. Editor mode (`$decorate=true`)
+     * always bypasses the cache regardless.
+     */
+    'render_cache' => [
+        'enabled' => env('PAGE_STUDIO_RENDER_CACHE', false),
+        'store'   => env('PAGE_STUDIO_RENDER_CACHE_STORE'),
+        'ttl'     => (int) env('PAGE_STUDIO_RENDER_CACHE_TTL', 3600),
+    ],
+
     'variable_types' => [
         'int' => [
             'label'    => 'Integer',
