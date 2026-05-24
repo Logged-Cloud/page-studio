@@ -11,6 +11,9 @@ class ColumnsBlock extends BlockType
     public static function label(): string { return '2 Columns'; }
     public static function icon(): string  { return '⊟'; }
     public static function group(): string { return 'layout'; }
+    // Uses CSS grid · Outlook + most Gmail variants flat-stack it. Hide
+    // from the palette when the editor is in email mode.
+    public static function emailSafe(): bool { return false; }
 
     public static function slots(): array
     {

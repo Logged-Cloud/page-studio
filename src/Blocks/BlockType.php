@@ -41,6 +41,19 @@ abstract class BlockType
     }
 
     /**
+     * Whether this block renders cleanly inside an email client. Defaults
+     * to true · override and return false on blocks that depend on
+     * `display: grid`, `color-mix`, JavaScript, or any other feature
+     * Outlook / Gmail / Apple Mail won't honour. When the page-builder
+     * mounts with `emailMode => true`, palettes hide blocks whose
+     * `emailSafe()` returns false.
+     */
+    public static function emailSafe(): bool
+    {
+        return true;
+    }
+
+    /**
      * Named child slots for layout blocks · 'body', 'left', 'right', etc.
      * Empty for plain content blocks.
      *
@@ -68,13 +81,14 @@ abstract class BlockType
     public static function toLibraryEntry(): array
     {
         return [
-            'group'    => static::group(),
-            'label'    => static::label(),
-            'icon'     => static::icon(),
-            'settings' => static::settings(),
-            'slots'    => static::slots(),
-            'custom'   => true,
-            'class'    => static::class,
+            'group'       => static::group(),
+            'label'       => static::label(),
+            'icon'        => static::icon(),
+            'settings'    => static::settings(),
+            'slots'       => static::slots(),
+            'email_safe'  => static::emailSafe(),
+            'custom'      => true,
+            'class'       => static::class,
         ];
     }
 }

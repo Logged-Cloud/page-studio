@@ -236,15 +236,20 @@ pattern shows up, the page-builder fits.
 
 Replace a CKEditor / TinyMCE textarea in a Livewire component. Variables come from the controller (booking, customer, program), the editor saves blocks, your existing send pipeline calls `PageRenderer::render()` on those blocks to produce the email HTML.
 
+Pass `emailMode => true` and the palette hides blocks that don't survive Outlook + Gmail (the CSS-grid columns + the color-mix card). Authors only see the blocks that render correctly in an inbox:
+
 ```blade
 @livewire('page-studio.page-builder', [
+    'emailMode' => true,
     'variables' => [
-        'program' => $program,
-        'user'    => $recipient,
+        'program'  => $program,
+        'user'     => $recipient,
         'greeting' => $program->emailGreeting ?? 'Dear',
     ],
 ])
 ```
+
+Each `BlockType` declares its own compatibility via `public static function emailSafe(): bool` (defaults to true). Override on a custom block when its CSS won't reach an email client cleanly, and the page-builder filters it out automatically in email mode.
 
 ### Marketing landing pages
 

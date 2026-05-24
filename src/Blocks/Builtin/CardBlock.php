@@ -11,6 +11,10 @@ class CardBlock extends BlockType
     public static function label(): string { return 'Card'; }
     public static function icon(): string  { return '⬜'; }
     public static function group(): string { return 'layout'; }
+    // The tinted background uses `color-mix(in srgb, ...)` which Gmail and
+    // older Outlook strip · the result is a flat white box. Hide from
+    // email-mode palettes.
+    public static function emailSafe(): bool { return false; }
 
     public static function slots(): array
     {
