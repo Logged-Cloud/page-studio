@@ -4,6 +4,7 @@
     @page-studio:graph:saved.window="showToast('Graph autosaved', true)"
     @page-studio:graph:copied.window="showToast('Copied ' + ($event.detail.count || 0) + ' nodes', true)"
     @page-studio:replace:done.window="showToast(($event.detail.count || 0) + ' blocks updated', true)"
+    @page-studio:lock:denied.window="showToast('Block is being edited by ' + ($event.detail.holder || 'someone else'), false)"
     class="ps-page-builder"
     data-component="page-studio.page-builder"
 >
@@ -58,6 +59,28 @@
                         }
                     @endphp
                     {{ implode(', ', $parts) }}
+                </span>
+            @endif
+
+            {{-- Presence · "who else is here" pills next to the diff stamp.
+                 Hidden when nobody else is on the page so single-author
+                 editing stays visually quiet. --}}
+            @php $peers = $this->activePeers; @endphp
+            @if (! empty($peers))
+                <span class="ps-pb-presence" title="Other people viewing this page">
+                    <span class="ps-pb-presence-label">Viewing:</span>
+                    @foreach ($peers as $peer)
+                        @php
+                            $initials = collect(explode(' ', trim($peer['name'])))
+                                ->filter()
+                                ->map(fn ($p) => mb_substr($p, 0, 1))
+                                ->take(2)
+                                ->implode('');
+                            $initials = $initials !== '' ? mb_strtoupper($initials) : '?';
+                        @endphp
+                        <span class="ps-pb-presence-chip"
+                              title="{{ $peer['name'] }} · last seen {{ $peer['last_seen'] }}">{{ $initials }}</span>
+                    @endforeach
                 </span>
             @endif
 
@@ -360,10 +383,59 @@
                 </div>
             </main>
 
-            {{-- ─── RIGHT · settings panel ─── --}}
+            {{-- ─── RIGHT · settings + activity panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--right"
-                   x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId)" x-cloak>
-                <section class="ps-pb-section">
+                   x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId || rightTab !== 'settings')" x-cloak>
+
+                {{-- Rail tab strip · the Settings tab keeps the existing
+                     editing UX, the Activity tab swaps in the polling feed.
+                     Comments tab is reserved for a future PR. --}}
+                <div class="ps-pb-rail-tab-strip">
+                    <button type="button"
+                            class="ps-pb-rail-tab"
+                            :class="rightTab === 'settings' ? 'is-active' : ''"
+                            @click="rightTab = 'settings'">Settings</button>
+                    <button type="button"
+                            class="ps-pb-rail-tab"
+                            :class="rightTab === 'activity' ? 'is-active' : ''"
+                            @click="rightTab = 'activity'">Activity</button>
+                </div>
+
+                <section class="ps-pb-section" x-show="rightTab === 'activity'" x-cloak>
+                    <h3>Activity</h3>
+                    @php $feed = $this->activityFeed; @endphp
+                    @if (empty($feed))
+                        <p class="ps-pb-hint">No activity yet · saves, publishes and comments will show up here.</p>
+                    @else
+                        <ul class="ps-pb-activity-list">
+                            @foreach ($feed as $row)
+                                @php
+                                    $icon = match ($row['verb']) {
+                                        'saved'            => '💾',
+                                        'published'        => '🚀',
+                                        'unpublished'      => '🚀',
+                                        'comment_added',
+                                        'comment_resolved' => '💬',
+                                        'lock_acquired'    => '🔒',
+                                        default            => '·',
+                                    };
+                                @endphp
+                                <li class="ps-pb-activity-row">
+                                    <span class="ps-pb-activity-icon">{{ $icon }}</span>
+                                    <span class="ps-pb-activity-text">{{ $row['summary'] }}</span>
+                                    @if ($row['created_at'])
+                                        <span class="ps-pb-activity-when"
+                                              :title="new Date('{{ $row['created_at'] }}').toLocaleString()">
+                                            {{ \Carbon\Carbon::parse($row['created_at'])->diffForHumans() }}
+                                        </span>
+                                    @endif
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                </section>
+
+                <section class="ps-pb-section" x-show="rightTab === 'settings'" x-cloak>
                     <h3>Settings</h3>
                     @if ($this->selectedBlock)
                         @php $block = $this->selectedBlock; $prefix = $this->selectedSettingsPrefix(); @endphp
@@ -1518,6 +1590,10 @@
                         // remembers the block path while the user types.
                         snippetPrompt: { open: false, path: '', name: '', label: '' },
                         libraryOpen: false,
+                        // Which right-rail tab is showing · 'settings' is the
+                        // historical default; 'activity' surfaces the polling
+                        // collaboration feed.
+                        rightTab: 'settings',
                         toast: { show: false, ok: true, message: '' },
                         toastTimer: null,
 
@@ -1535,6 +1611,69 @@
                             if (typeof window !== 'undefined' && window.innerWidth <= 768) {
                                 if (this.$wire.drawerOpen) this.$wire.set('drawerOpen', false);
                             }
+
+                            // ─── Collaboration heartbeat ───────────────────
+                            // Every 8s · refresh whatever block locks the
+                            // current author holds and bump the presence row
+                            // for this tab. Both calls no-op server-side when
+                            // the editor is in ephemeral mode, so we don't
+                            // need to gate the interval here.
+                            this.collabHeartbeat = setInterval(() => {
+                                const held = this.heldBlockIds();
+                                if (held.length > 0) {
+                                    this.$wire.heartbeatBlockLocks(held);
+                                }
+                                this.$wire.heartbeatPresence();
+                            }, 8000);
+
+                            // Release the lock + presence row on tab close ·
+                            // best-effort, browsers throttle async work in
+                            // beforeunload but the locks expire on their own
+                            // within 30s either way.
+                            this.boundBeforeUnload = () => {
+                                const sel = this.$wire.selectedPath;
+                                if (sel) {
+                                    // Resolve the block id from the path
+                                    // so the server can scope the delete.
+                                    const id = this.blockIdForPath(sel);
+                                    if (id) {
+                                        try { this.$wire.releaseBlockLock(id); } catch (_) {}
+                                    }
+                                }
+                            };
+                            window.addEventListener('beforeunload', this.boundBeforeUnload);
+                        },
+
+                        // Resolve a block path like "0/body/2" into its block
+                        // id by walking the in-memory blocks array · the lock
+                        // server methods accept ids, not paths.
+                        blockIdForPath(path) {
+                            if (! path) return null;
+                            const parts = String(path).split('/');
+                            let list = this.$wire.blocks || [];
+                            let node = null;
+                            for (let i = 0; i < parts.length; i++) {
+                                const seg = parts[i];
+                                if (/^\d+$/.test(seg)) {
+                                    node = list[Number(seg)];
+                                    if (! node) return null;
+                                } else {
+                                    list = (node && node.children && node.children[seg]) || [];
+                                }
+                            }
+                            return node ? node.id || null : null;
+                        },
+
+                        // The block ids whose locks the current tab is
+                        // responsible for keeping alive · today only the
+                        // selected block, but the shape stays an array so a
+                        // future multi-select can pass multiple ids without
+                        // changing the heartbeat method's signature.
+                        heldBlockIds() {
+                            const sel = this.$wire.selectedPath;
+                            if (! sel) return [];
+                            const id = this.blockIdForPath(sel);
+                            return id ? [id] : [];
                         },
 
                         get selectedPath() { return this.$wire.selectedPath; },
@@ -3951,6 +4090,104 @@
                     text-transform: uppercase;
                     letter-spacing: .06em;
                     color: var(--ink-dim, #A3A099);
+                }
+
+                /* ─── Collaboration · block locks, presence, activity feed ─── */
+                .ps-pb-block-wrap.is-locked {
+                    /* Dim a locked block enough that it reads as "claimed"
+                       without hiding the content · collaborators still need
+                       to see the in-flight edits. */
+                    opacity: .55;
+                    pointer-events: none;
+                    position: relative;
+                }
+                .ps-pb-lock-ribbon {
+                    position: absolute;
+                    top: 0;
+                    left: 0;
+                    z-index: 5;
+                    background: var(--danger, #ef4444);
+                    color: #fff;
+                    font-size: .7rem;
+                    padding: .12rem .4rem;
+                    border-bottom-right-radius: .25rem;
+                    font-weight: 600;
+                    letter-spacing: .02em;
+                }
+                .ps-pb-presence {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .25rem;
+                    font-size: .7rem;
+                    color: var(--ink-dim, #A3A099);
+                }
+                .ps-pb-presence-label {
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                    font-size: .6rem;
+                }
+                .ps-pb-presence-chip {
+                    display: inline-flex;
+                    align-items: center;
+                    justify-content: center;
+                    width: 1.5rem;
+                    height: 1.5rem;
+                    border-radius: 50%;
+                    background: var(--accent, #2C66E8);
+                    color: #fff;
+                    font-size: .65rem;
+                    font-weight: 600;
+                    letter-spacing: .02em;
+                }
+                .ps-pb-activity-list {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                    display: flex;
+                    flex-direction: column;
+                    gap: .35rem;
+                }
+                .ps-pb-activity-row {
+                    display: flex;
+                    gap: .4rem;
+                    align-items: flex-start;
+                    font-size: .75rem;
+                    color: var(--ink, #F0EDE5);
+                    padding: .25rem .35rem;
+                    border-radius: .25rem;
+                    background: rgba(255,255,255,.02);
+                }
+                .ps-pb-activity-icon {
+                    flex: none;
+                    width: 1rem;
+                    text-align: center;
+                }
+                .ps-pb-activity-when {
+                    color: var(--ink-dim, #A3A099);
+                    font-size: .65rem;
+                    margin-left: auto;
+                    white-space: nowrap;
+                }
+                .ps-pb-rail-tab-strip {
+                    display: flex;
+                    gap: .25rem;
+                    margin-bottom: .5rem;
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-rail-tab {
+                    background: transparent;
+                    border: 0;
+                    color: var(--ink-dim, #A3A099);
+                    padding: .3rem .55rem;
+                    font-size: .7rem;
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                    cursor: pointer;
+                    border-bottom: 2px solid transparent;
+                }
+                .ps-pb-rail-tab.is-active {
+                    color: var(--ink, #F0EDE5);
+                    border-bottom-color: var(--accent, #2C66E8);
                 }
             </style>
         @endpush

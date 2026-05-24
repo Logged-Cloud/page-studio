@@ -9,9 +9,16 @@
 --}}
 @php $schema = config('page-studio.blocks.'.$block['type'], []); @endphp
 @php $slotJson = $slot === null ? 'null' : "'".$slot."'"; @endphp
+@php
+    // Collaboration · is another author currently editing this block?
+    // activeBlockLocks is keyed by block id and only contains OTHER users'
+    // claims, so a hit here means we should render the read-only ribbon.
+    $locks    = $this->activeBlockLocks;
+    $lockedBy = $locks[$block['id']]['name'] ?? null;
+@endphp
 
 <div
-    class="ps-pb-block-wrap"
+    class="ps-pb-block-wrap {{ $lockedBy ? 'is-locked' : '' }}"
     :class="selectedPath === @js($path) ? 'is-selected' : ''"
     wire:key="block-{{ $block['id'] }}"
     data-block-path="{{ $path }}"
@@ -26,6 +33,14 @@
     @drop.prevent.stop="onBlockDrop($event, @js($parentPath), {{ $slotJson }}, {{ $index }})"
     @pointerdown="startTouchDrag($event, 'block', @js($path), @js($block['type']))"
 >
+    @if ($lockedBy)
+        {{-- Lock ribbon · purely informational, never captures pointer
+             events so the block underneath stays readable / scrollable. --}}
+        <div class="ps-pb-lock-ribbon" style="pointer-events:none">
+            🔒 {{ $lockedBy }} editing
+        </div>
+    @endif
+
     <div class="ps-pb-block-handle">
         <span class="ps-pb-block-type">{{ $schema['label'] ?? $block['type'] }}</span>
         <div class="ps-pb-block-controls">
