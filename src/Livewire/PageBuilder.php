@@ -68,7 +68,12 @@ class PageBuilder extends Component
      *
      * @var array<string, mixed>
      */
-    public array $meta = ['subject' => '', 'preheader' => '', 'replyTo' => ''];
+    public array $meta = [
+        // Email-mode keys
+        'subject' => '', 'preheader' => '', 'replyTo' => '',
+        // SEO panel keys · rendered by the host app's layout
+        'seo_title' => '', 'seo_description' => '', 'og_image' => '',
+    ];
 
     /**
      * Authored block tree · the root list. Layout blocks carry `children`
@@ -639,6 +644,88 @@ class PageBuilder extends Component
         // moveBlock uses an index in the "after removal" coordinate space, so
         // bump the target by one when moving down so the block actually swaps.
         $this->moveBlock($fromPath, $parentPath, $slot, $delta > 0 ? $target + 1 : $target);
+    }
+
+    /**
+     * Snapshot of the last a11y scan · null = no scan run yet, [] = scan
+     * found nothing, [...] = list of findings. Kept on the component so
+     * the rail can render the result without re-running the scan on every
+     * Livewire commit.
+     *
+     * @var array<int, array{kind:string,message:string}>|null
+     */
+    public ?array $a11yFindings = null;
+
+    /**
+     * Run a quick accessibility sweep of the current block tree. Catches
+     * the two highest-signal issues authors miss: image blocks missing
+     * alt text, and heading-level skips (h1 → h3 with no h2). The full
+     * landscape is bigger (contrast, focus order, ARIA correctness) but
+     * those need rendered output or a real browser to assess.
+     *
+     * Side-effect: stores the result in $a11yFindings.
+     */
+    public function runA11yScan(): void
+    {
+        $findings = [];
+        $headings = [];
+
+        $walk = function (array $blocks) use (&$walk, &$findings, &$headings) {
+            foreach ($blocks as $b) {
+                $type = $b['type'] ?? '';
+                $s    = $b['settings'] ?? [];
+                if ($type === 'image' && empty(trim((string) ($s['alt'] ?? '')))) {
+                    $findings[] = [
+                        'kind'    => 'Missing alt text',
+                        'message' => 'Image block "'.($s['src'] ?? '(no src)').'" has no alt attribute.',
+                    ];
+                }
+                if ($type === 'heading') {
+                    $level = (int) preg_replace('/[^0-9]/', '', (string) ($s['level'] ?? 'h2'));
+                    if ($level > 0) $headings[] = $level;
+                }
+                if (! empty($b['children']) && is_array($b['children'])) {
+                    foreach ($b['children'] as $slot) {
+                        if (is_array($slot)) $walk($slot);
+                    }
+                }
+            }
+        };
+        $walk($this->blocks);
+
+        // Heading outline check · h2 should not follow h4, etc.
+        for ($i = 1; $i < count($headings); $i++) {
+            if ($headings[$i] > $headings[$i - 1] + 1) {
+                $findings[] = [
+                    'kind'    => 'Heading-level skip',
+                    'message' => 'h'.$headings[$i - 1].' is followed by h'.$headings[$i].'. Screen-reader users hear an outline gap.',
+                ];
+            }
+        }
+
+        $this->a11yFindings = $findings;
+    }
+
+    /**
+     * Keyboard shortcut backing · Alt-ArrowUp / Alt-ArrowDown when a block
+     * is selected nudges it up or down within its parent slot. Decomposes
+     * the selectedPath into (parentPath, slot, index) so the Alpine
+     * handler doesn't need to.
+     */
+    public function moveSelectedBlock(int $delta): void
+    {
+        if ($this->selectedPath === '' || ($delta !== -1 && $delta !== 1)) return;
+
+        $segments = explode('.', $this->selectedPath);
+        $index    = (int) array_pop($segments);
+        $slot     = null;
+        if (! empty($segments) && end($segments) !== 'children') {
+            // path looks like "...children.<slot>.<index>"
+            $slot = array_pop($segments);
+            array_pop($segments); // drop the literal "children"
+        }
+        $parentPath = implode('.', $segments);
+        $this->moveSibling($parentPath, $slot, $index, $delta);
     }
 
     public function togglePreview(): void

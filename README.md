@@ -18,7 +18,7 @@ Designed to drop into any Livewire 3+ Laravel app.
 All four features ship out of the box on v2.2+ · short-poll based (~8s heartbeat), pluggable for a Reverb / Pusher swap later.
 
 > **Extending the studio?** Step-by-step tutorials live under `docs/tutorials/`:
-> [Custom block](docs/tutorials/custom-blocks.md) · [Custom node](docs/tutorials/custom-nodes.md) · [Custom node with dynamic outputs](docs/tutorials/dynamic-outputs.md) · [Custom template](docs/tutorials/custom-templates.md) · [Theming + light mode](docs/tutorials/theming.md) · [Migrate HTML content](docs/tutorials/migrate-html.md)
+> [Custom block](docs/tutorials/custom-blocks.md) · [Custom node](docs/tutorials/custom-nodes.md) · [Custom node with dynamic outputs](docs/tutorials/dynamic-outputs.md) · [Custom template](docs/tutorials/custom-templates.md) · [Theming + light mode](docs/tutorials/theming.md) · [Migrate HTML content](docs/tutorials/migrate-html.md) · [Deploying to prod](docs/tutorials/deploying-to-prod.md) · [Auth-gated authoring](docs/tutorials/auth-gated-authoring.md) · [i18n strategies](docs/tutorials/i18n-strategies.md)
 
 ---
 
@@ -41,6 +41,9 @@ All four features ship out of the box on v2.2+ · short-poll based (~8s heartbea
   - [Custom templates · seed routes + pages + graphs in one shot](docs/tutorials/custom-templates.md)
   - [Theming · light mode + your own palette](docs/tutorials/theming.md)
   - [Migrate HTML content into the block tree](docs/tutorials/migrate-html.md)
+  - [Deploying to production](docs/tutorials/deploying-to-prod.md) · view-cache, render-cache, queue, migration safety
+  - [Auth-gated authoring](docs/tutorials/auth-gated-authoring.md) · route + Livewire-component gating, role policies
+  - [i18n strategies](docs/tutorials/i18n-strategies.md) · page-per-locale / shared-layout / hybrid
 - [Starter templates](#starter-templates)
 - [Importing existing HTML](#importing-existing-html)
 - [Custom blocks (in this README)](#custom-blocks--developer-defined)
