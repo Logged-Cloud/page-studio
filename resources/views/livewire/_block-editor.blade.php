@@ -13,8 +13,9 @@
     // Collaboration · is another author currently editing this block?
     // activeBlockLocks is keyed by block id and only contains OTHER users'
     // claims, so a hit here means we should render the read-only ribbon.
-    $locks    = $this->activeBlockLocks;
-    $lockedBy = $locks[$block['id']]['name'] ?? null;
+    $locks      = $this->activeBlockLocks;
+    $lockedBy   = $locks[$block['id']]['name']  ?? null;
+    $lockField  = $locks[$block['id']]['field'] ?? '';
 @endphp
 
 <div
@@ -38,6 +39,9 @@
              events so the block underneath stays readable / scrollable. --}}
         <div class="ps-pb-lock-ribbon" style="pointer-events:none">
             🔒 {{ $lockedBy }} editing
+            @if ($lockField !== '')
+                · <em style="font-style:normal;opacity:.85">{{ $lockField }}</em>
+            @endif
         </div>
     @endif
 
