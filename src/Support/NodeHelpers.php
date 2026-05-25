@@ -82,12 +82,26 @@ class NodeHelpers
         return [$value];
     }
 
-    public static function formatDate(mixed $value, string $format): ?string
+    public static function formatDate(mixed $value, string $format, int $offsetAmount = 0, string $offsetUnit = 'days'): ?string
     {
         if ($value === null || $value === '') return null;
         try {
-            $dt = $value instanceof \DateTimeInterface ? $value : new \DateTimeImmutable((string) $value);
-            return $dt->format($format ?: 'Y-m-d');
+            $dt = $value instanceof \DateTimeInterface
+                ? \DateTimeImmutable::createFromInterface($value)
+                : new \DateTimeImmutable((string) $value);
+            if ($offsetAmount !== 0) {
+                $sign = $offsetAmount > 0 ? '+' : '-';
+                $unit = in_array($offsetUnit, ['minutes', 'hours', 'days', 'weeks', 'months', 'years'], true)
+                    ? $offsetUnit
+                    : 'days';
+                $dt = $dt->modify($sign.abs($offsetAmount).' '.$unit);
+            }
+            $fmt = $format ?: 'Y-m-d';
+            return match (strtolower($fmt)) {
+                'iso', 'iso8601'    => $dt->format(\DATE_ATOM),
+                'timestamp', 'unix' => (string) $dt->format('U'),
+                default             => $dt->format($fmt),
+            };
         } catch (\Throwable) {
             return null;
         }

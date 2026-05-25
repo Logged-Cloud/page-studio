@@ -5,6 +5,8 @@
     @page-studio:graph:copied.window="showToast('Copied ' + ($event.detail.count || 0) + ' nodes', true)"
     @page-studio:replace:done.window="showToast(($event.detail.count || 0) + ' blocks updated', true)"
     @page-studio:lock:denied.window="showToast('Block is being edited by ' + ($event.detail.holder || 'someone else'), false)"
+    @keydown.window.alt.up.prevent="if ($wire.selectedPath) $wire.moveSelectedBlock(-1)"
+    @keydown.window.alt.down.prevent="if ($wire.selectedPath) $wire.moveSelectedBlock(1)"
     class="ps-page-builder"
     data-component="page-studio.page-builder"
 >
@@ -121,6 +123,30 @@
                     {{ $drawerOpen ? 'Hide nodes' : 'Show nodes' }}
                 </button>
             @endif
+
+            <div class="ps-pb-device-toggle" role="group" aria-label="Preview device frame">
+                <button type="button"
+                        @click="device = 'desktop'; localStorage.setItem('psPbDevice', 'desktop')"
+                        :class="device === 'desktop' ? 'is-active' : ''"
+                        class="ps-pb-device-btn"
+                        :aria-pressed="device === 'desktop' ? 'true' : 'false'"
+                        aria-label="Desktop frame"
+                        title="Desktop">▭</button>
+                <button type="button"
+                        @click="device = 'tablet'; localStorage.setItem('psPbDevice', 'tablet')"
+                        :class="device === 'tablet' ? 'is-active' : ''"
+                        class="ps-pb-device-btn"
+                        :aria-pressed="device === 'tablet' ? 'true' : 'false'"
+                        aria-label="Tablet frame"
+                        title="Tablet (768px)">▢</button>
+                <button type="button"
+                        @click="device = 'phone'; localStorage.setItem('psPbDevice', 'phone')"
+                        :class="device === 'phone' ? 'is-active' : ''"
+                        class="ps-pb-device-btn"
+                        :aria-pressed="device === 'phone' ? 'true' : 'false'"
+                        aria-label="Phone frame"
+                        title="Phone (390px)">▯</button>
+            </div>
 
             <button type="button" wire:click="togglePreview"
                     class="ps-pb-btn"
@@ -367,7 +393,7 @@
             </aside>
 
             {{-- ─── CENTRE · canvas ─── --}}
-            <main class="ps-pb-canvas-wrap">
+            <main class="ps-pb-canvas-wrap" :class="'ps-pb-canvas-wrap--' + device">
                 <div class="ps-pb-canvas"
                      @click.self="$wire.clearSelection()"
                      @dragover.prevent="onCanvasDragOver($event)"
@@ -406,7 +432,7 @@
 
             {{-- ─── RIGHT · settings + comments + activity panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--right"
-                   x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId || rightTab !== 'settings')" x-cloak>
+                   x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId || ['comments','activity','seo','a11y'].includes(rightTab))" x-cloak>
 
                 {{-- Tab strip · Settings / Comments / Activity all share the
                      rail. Selecting a non-Settings tab keeps the rail open
@@ -431,10 +457,72 @@
                             class="ps-pb-rail-tab"
                             :class="rightTab === 'activity' ? 'is-active' : ''"
                             @click="rightTab = 'activity'">Activity</button>
+                    <button type="button"
+                            class="ps-pb-rail-tab"
+                            :class="rightTab === 'seo' ? 'is-active' : ''"
+                            @click="rightTab = 'seo'">SEO</button>
+                    <button type="button"
+                            class="ps-pb-rail-tab"
+                            :class="rightTab === 'a11y' ? 'is-active' : ''"
+                            @click="rightTab = 'a11y'">A11y</button>
                 </div>
 
                 <section class="ps-pb-section" x-show="rightTab === 'comments'" x-cloak>
                     @include('page-studio::livewire._comments-panel')
+                </section>
+
+                <section class="ps-pb-section" x-show="rightTab === 'seo'" x-cloak>
+                    <h3>SEO</h3>
+                    <p style="color: var(--ink-dim, #A3A099); font-size: .85rem; margin: 0 0 .75rem;">
+                        Stored in the page <code>meta</code> blob. Render them in your host app's layout
+                        (<code>&lt;title&gt;</code>, <code>&lt;meta name="description"&gt;</code>,
+                        <code>&lt;meta property="og:image"&gt;</code>).
+                    </p>
+                    <label class="ps-pb-meta-field">
+                        <span>Title</span>
+                        <input type="text"
+                               wire:model.live.debounce.400ms="meta.seo_title"
+                               placeholder="Page title shown in the browser tab + search results"
+                               class="ps-pb-meta-input">
+                    </label>
+                    <label class="ps-pb-meta-field">
+                        <span>Description</span>
+                        <textarea wire:model.live.debounce.400ms="meta.seo_description"
+                                  placeholder="One- or two-sentence description for search snippets + social previews"
+                                  class="ps-pb-meta-input" rows="3"></textarea>
+                    </label>
+                    <label class="ps-pb-meta-field">
+                        <span>OG image URL</span>
+                        <input type="url"
+                               wire:model.live.debounce.400ms="meta.og_image"
+                               placeholder="https://example.com/social-card.png"
+                               class="ps-pb-meta-input">
+                    </label>
+                </section>
+
+                <section class="ps-pb-section" x-show="rightTab === 'a11y'" x-cloak>
+                    <h3>Accessibility</h3>
+                    <button type="button" wire:click="runA11yScan" class="ps-pb-btn">Run accessibility scan</button>
+                    @php $findings = $this->a11yFindings ?? null; @endphp
+                    @if ($findings === null)
+                        <p style="color: var(--ink-dim, #A3A099); font-size: .85rem; margin-top: .75rem;">
+                            Click <strong>Run accessibility scan</strong> to check images for missing alt text + the
+                            heading-level outline for skipped levels.
+                        </p>
+                    @elseif (empty($findings))
+                        <p style="color: #22c55e; font-size: .85rem; margin-top: .75rem;">
+                            ✓ No accessibility issues found.
+                        </p>
+                    @else
+                        <ul style="list-style: none; padding: 0; margin: .75rem 0 0; font-size: .85rem;">
+                            @foreach ($findings as $f)
+                                <li style="padding: .35rem 0; border-bottom: 1px solid var(--line, #3A3D40);">
+                                    <strong style="color: #f97316;">{{ $f['kind'] }}</strong> ·
+                                    <span style="color: var(--ink-dim, #A3A099);">{{ $f['message'] }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
                 </section>
 
                 <section class="ps-pb-section" x-show="rightTab === 'activity'" x-cloak>
@@ -1621,6 +1709,11 @@
                         rightCollapsed: (typeof window !== 'undefined' && window.innerWidth <= 768)
                             ? true
                             : localStorage.getItem('psPbRightCollapsed') === '1',
+                        // Device-frame preview · 'desktop' | 'tablet' | 'phone'.
+                        // Wraps the canvas in a max-width container so authors
+                        // can sanity-check the responsive shape without
+                        // resizing the browser window itself.
+                        device: localStorage.getItem('psPbDevice') || 'desktop',
                         // Variable picker · opened by right-click on a text field.
                         // Stores the target field + its caret position at click
                         // time so we know exactly where to splice the token.
@@ -2854,6 +2947,20 @@
                 .ps-pb-rail--left   { border-right: 1px solid var(--line, #3A3D40); grid-area: left; }
                 .ps-pb-rail--right  { border-left:  1px solid var(--line, #3A3D40); grid-area: right; }
                 .ps-pb-canvas-wrap  { grid-area: canvas; background: var(--surface, #16171a); padding: 1.25rem; overflow-y: auto; }
+                /* Device-frame previews · the canvas is centred and its
+                   max-width is clamped to a typical viewport size for that
+                   form factor. Pure visual constraint, no responsive CSS
+                   inside the canvas blocks · the host theme owns that. */
+                .ps-pb-canvas-wrap--tablet .ps-pb-canvas { max-width: 48rem; margin-left: auto; margin-right: auto; box-shadow: 0 0 0 1px var(--line, #3A3D40); }
+                .ps-pb-canvas-wrap--phone  .ps-pb-canvas { max-width: 24.375rem; margin-left: auto; margin-right: auto; box-shadow: 0 0 0 1px var(--line, #3A3D40); }
+                .ps-pb-device-toggle { display: inline-flex; gap: 1px; border: 1px solid var(--line, #3A3D40); border-radius: .35rem; overflow: hidden; }
+                .ps-pb-device-btn {
+                    background: transparent; color: var(--ink-dim, #A3A099);
+                    border: 0; padding: 0 .55rem; height: 1.75rem;
+                    cursor: pointer; font: inherit; font-size: .85rem;
+                }
+                .ps-pb-device-btn.is-active { background: rgba(255,255,255,.05); color: var(--ink, #F0EDE5); }
+                .ps-pb-device-btn:hover { color: var(--ink, #F0EDE5); }
                 .ps-pb-canvas {
                     background: #fff;
                     color: #111;
@@ -3351,6 +3458,20 @@
                 .ps-pb-email-meta-field input:focus {
                     border-color: var(--accent, #2C66E8);
                 }
+                /* SEO + future page-meta fields use the same shape. */
+                .ps-pb-meta-field { display: flex; flex-direction: column; gap: .2rem; font-size: .8rem; margin-bottom: .65rem; }
+                .ps-pb-meta-field span { color: var(--ink-dim, #A3A099); text-transform: uppercase; letter-spacing: .06em; font-size: .65rem; }
+                .ps-pb-meta-input {
+                    background: var(--surface, #16171a);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .25rem;
+                    padding: .35rem .55rem;
+                    font-size: .85rem;
+                    outline: none;
+                    font-family: inherit;
+                }
+                .ps-pb-meta-input:focus { border-color: var(--accent, #2C66E8); }
                 @media (max-width: 768px) {
                     .ps-pb-email-meta { grid-template-columns: 1fr; gap: .4rem; }
                 }
