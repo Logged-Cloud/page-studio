@@ -187,6 +187,8 @@ class PageStudioServiceProvider extends ServiceProvider
             Blocks\Builtin\EmbedBlock::class,
             Blocks\Builtin\VideoBlock::class,
             Blocks\Builtin\AccordionBlock::class,
+            Blocks\Builtin\AnimatedTextBlock::class,
+            Blocks\Builtin\ImageCarouselBlock::class,
             // Layout
             Blocks\Builtin\HeroBlock::class,
             Blocks\Builtin\SectionBlock::class,
