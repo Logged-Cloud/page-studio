@@ -583,13 +583,17 @@
                                         rows="4"
                                         data-wire-prop="{{ $prefix.$key }}"
                                         wire:model.live.debounce.300ms="{{ $prefix.$key }}"
+                                        @focus="$wire.setEditingField(@js($block['id']), @js($def['label'] ?? $key))"
+                                        @blur="$wire.clearEditingField(@js($block['id']))"
                                         @dragover.prevent="onDropZoneOver($event)"
                                         @dragleave="$event.currentTarget.removeAttribute('data-ps-var-drop')"
                                         @drop.prevent="onDropIntoField($event)"
                                         @contextmenu.prevent="openVarPicker($event)"
                                     ></textarea>
                                 @elseif ($def['kind'] === 'select')
-                                    <select wire:model.live="{{ $prefix.$key }}">
+                                    <select wire:model.live="{{ $prefix.$key }}"
+                                            @focus="$wire.setEditingField(@js($block['id']), @js($def['label'] ?? $key))"
+                                            @blur="$wire.clearEditingField(@js($block['id']))">
                                         @foreach ($def['options'] ?? [] as $val => $lbl)
                                             <option value="{{ $val }}">{{ $lbl }}</option>
                                         @endforeach
@@ -599,6 +603,8 @@
                                         type="{{ $def['kind'] === 'url' ? 'url' : ($def['kind'] === 'number' ? 'number' : 'text') }}"
                                         data-wire-prop="{{ $prefix.$key }}"
                                         wire:model.live.debounce.300ms="{{ $prefix.$key }}"
+                                        @focus="$wire.setEditingField(@js($block['id']), @js($def['label'] ?? $key))"
+                                        @blur="$wire.clearEditingField(@js($block['id']))"
                                         @dragover.prevent="onDropZoneOver($event)"
                                         @dragleave="$event.currentTarget.removeAttribute('data-ps-var-drop')"
                                         @drop.prevent="onDropIntoField($event)"

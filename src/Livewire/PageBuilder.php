@@ -1608,6 +1608,56 @@ class PageBuilder extends Component
     }
 
     /**
+     * Inline edit-lock cursor · the current author has just focused a
+     * settings input. Stamp the field label onto the existing block lock
+     * (or acquire one) so other reviewers see "Alice editing · Heading
+     * text" rather than just "Alice editing". 64-char cap matches the
+     * column width; longer labels truncate.
+     */
+    public function setEditingField(string $blockId, string $field): void
+    {
+        $pageId = $this->resolvePageId();
+        if ($pageId === null || $blockId === '') return;
+        [$authorId, $authorName] = $this->currentAuthor();
+
+        $existing = BlockLock::where('page_id', $pageId)
+            ->where('block_id', $blockId)
+            ->first();
+        if ($existing && $existing->author_id !== $authorId
+            && $existing->expires_at && $existing->expires_at->isFuture()) {
+            return; // someone else holds the lock · don't trample
+        }
+
+        $trimmed = mb_substr($field, 0, 64);
+        BlockLock::updateOrCreate(
+            ['page_id' => $pageId, 'block_id' => $blockId],
+            [
+                'author_id'   => $authorId,
+                'author_name' => $authorName,
+                'field'       => $trimmed,
+                'expires_at'  => now()->addSeconds(30),
+            ],
+        );
+    }
+
+    /**
+     * Companion to setEditingField · clears the field label on blur
+     * without releasing the whole lock. Lock TTL keeps it alive across
+     * the brief gap between blur and the next focus.
+     */
+    public function clearEditingField(string $blockId): void
+    {
+        $pageId = $this->resolvePageId();
+        if ($pageId === null || $blockId === '') return;
+        [$authorId] = $this->currentAuthor();
+
+        BlockLock::where('page_id', $pageId)
+            ->where('block_id', $blockId)
+            ->where('author_id', $authorId)
+            ->update(['field' => null]);
+    }
+
+    /**
      * Locks currently held by OTHER users on the bound page · the
      * shape is keyed by block id so the block-editor template can do
      * a quick lookup per render.
@@ -1636,6 +1686,7 @@ class PageBuilder extends Component
             // ribbon themselves.
             $out[$row->block_id] = [
                 'name'       => (string) ($row->author_name ?: 'Someone'),
+                'field'      => (string) ($row->field ?? ''),
                 'expires_at' => $row->expires_at?->toIso8601String() ?? '',
             ];
         }
