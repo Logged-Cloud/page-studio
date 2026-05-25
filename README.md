@@ -46,7 +46,7 @@ All four features ship out of the box on v2.2+ · short-poll based (~8s heartbea
 - [Custom blocks (in this README)](#custom-blocks--developer-defined)
 - [Custom nodes (in this README)](#custom-nodes--developer-defined)
 - [Variable types](#variable-types)
-- [Render cache](#render-cache)
+- [Render cache](#render-cache) · [performance notes](docs/performance.md)
 - [Engine internals](#engine-internals)
 - [Theming](#theming)
 - [Events](#events)
@@ -785,6 +785,8 @@ Off by default so existing apps don't change behaviour. Enable in `config/page-s
 ```
 
 No active invalidation needed: any change to the blocks or context yields a different sha1 and misses the cache; stale entries age out via TTL.
+
+For typical content trees (heading / paragraph / button / image / list / quote / columns / hero) the render path is already faster than the cache lookup itself, so leaving the cache off is usually fine. The cache becomes useful when a block's `render()` does heavy work (DB lookups in custom blocks, image transforms, HTTP fetches). See **[docs/performance.md](docs/performance.md)** for measured numbers + when to turn it on.
 
 ---
 
