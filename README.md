@@ -99,6 +99,10 @@ Collaboration: block locks ribbon the block another reviewer is editing; presenc
 
 ![Activity feed listing recent saves, a publish, and a comment](docs/screenshots/collab-activity.png)
 
+Nested layouts: every layout block (columns, columns-3, panel, card, section, conditional) recurses arbitrarily deep · drag a columns block into another columns slot, drop content into the inner slots. The editor's `_block-editor.blade.php` recursively includes itself for each child, so the canvas paints whatever depth you author.
+
+![Editor canvas showing four levels of nested columns · outer columns → columns-3 → inner columns → leaf paragraphs](docs/screenshots/nested-columns.png)
+
 Mobile: the rails collapse to slide-in sheets, the node drawer hides by default, the canvas owns the screen. Touch users get a real surface to work on.
 
 ![Page builder on a phone-width viewport with a heading, paragraph, divider, and CTA button](docs/screenshots/mobile.png)
