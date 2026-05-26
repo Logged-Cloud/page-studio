@@ -1954,6 +1954,11 @@
                     cursor: pointer;
                 }
                 .ps-pb-lock-takeover:hover { background: rgba(255,255,255,.32); }
+                /* Self-lock variant · green pill, no danger framing. */
+                .ps-pb-lock-ribbon--self {
+                    background: var(--success, #16a34a);
+                    color: #fff;
+                }
                 .ps-pb-presence {
                     display: inline-flex;
                     align-items: center;

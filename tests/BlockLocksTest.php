@@ -145,6 +145,72 @@ it('activeBlockLocks computed returns locks held only by other users', function 
         ->and($locks)->not->toHaveKey('blk-2');
 });
 
+it('activeBlockLocks does NOT show the viewer\'s own lock back to them when they are anonymous · "I just clicked it, it\'s me"', function () {
+    // Public-form / non-auth scenario · the single anonymous author
+    // claims a block and then re-reads activeBlockLocks on the next
+    // render. Their own claim must not appear as "Anonymous editing".
+    $page = blPage();
+    auth()->forgetGuards();
+
+    $pb = new PageBuilder();
+    $pb->mount(pageId: $page->id);
+
+    expect($pb->acquireBlockLock('blk-1'))->toBeTrue();
+
+    $row = BlockLock::where('block_id', 'blk-1')->first();
+    expect($row)->not->toBeNull()
+        ->and($row->author_id)->toBeNull()
+        ->and($row->author_name)->toBe('Anonymous');
+
+    expect($pb->activeBlockLocks())->not->toHaveKey('blk-1');
+});
+
+it('the viewer\'s own held locks surface via myBlockLocks so the template can render a "You editing" ribbon · NOT a "someone else" lock-out', function () {
+    // Same scenario, but assert the positive-confirmation path · the
+    // component should expose the blocks the current viewer holds so
+    // the editor can render a green "You editing" ribbon and avoid
+    // graying the block out.
+    $page = blPage();
+    auth()->forgetGuards();
+
+    $pb = new PageBuilder();
+    $pb->mount(pageId: $page->id);
+
+    expect($pb->myBlockLocks())->toBe([]);
+
+    $pb->acquireBlockLock('blk-self');
+
+    expect($pb->myBlockLocks())->toHaveKey('blk-self')
+        ->and($pb->activeBlockLocks())->not->toHaveKey('blk-self');
+
+    // Releasing must drop it from the own-locks computed too.
+    $pb->releaseBlockLock('blk-self');
+    expect($pb->myBlockLocks())->not->toHaveKey('blk-self');
+});
+
+it('a second anonymous tab sees the first tab\'s lock in activeBlockLocks · own-lock filtering is component-scoped, not global', function () {
+    // Without a session/component identity, we cannot truly tell two
+    // anonymous tabs apart · so a second anonymous viewer is still
+    // shown the first viewer's lock as a foreign claim. This is the
+    // intended trade-off — the alternative (suppress all anon locks)
+    // would mask real collisions in public-form / kiosk setups.
+    $page = blPage();
+    auth()->forgetGuards();
+
+    $pbA = new PageBuilder();
+    $pbA->mount(pageId: $page->id);
+    $pbA->acquireBlockLock('blk-shared');
+
+    // A separate component instance · models a different browser tab
+    // / device. heldBlockLockIds is empty here so the row falls
+    // through every filter and shows up.
+    $pbB = new PageBuilder();
+    $pbB->mount(pageId: $page->id);
+
+    expect($pbB->activeBlockLocks())->toHaveKey('blk-shared')
+        ->and($pbB->myBlockLocks())->not->toHaveKey('blk-shared');
+});
+
 it('activeBlockLocks suppresses a lock whose holder shares the viewer\'s name · models "another session of mine"', function () {
     // Alice signs in once and claims a block · simulates an earlier
     // browser tab / pre-relogin session.
