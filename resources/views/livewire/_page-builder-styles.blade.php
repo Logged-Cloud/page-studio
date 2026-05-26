@@ -175,10 +175,22 @@
                         position: fixed; inset: 0; z-index: 399;
                         background: rgba(0,0,0,.45);
                     }
-                    /* Toolbar wraps on narrow screens · save / preview keep
-                       their CTA-shape but the URL chip + toggles flow. */
-                    .ps-pb-toolbar { flex-wrap: wrap; gap: .35rem; padding: .5rem .65rem; }
-                    .ps-pb-toolbar code.ps-pb-path { font-size: .75rem; }
+                    /* Topbar wraps on narrow screens · save / preview keep
+                       their CTA-shape but the URL chip + toggles flow.
+                       The actions group also wraps so the publish + save
+                       buttons sit on a second line rather than overflowing
+                       horizontally and clipping at the viewport edge. */
+                    .ps-pb-topbar { flex-wrap: wrap; gap: .35rem; padding: .5rem .65rem; }
+                    .ps-pb-topbar code.ps-pb-path { font-size: .75rem; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
+                    .ps-pb-actions { flex-wrap: wrap; gap: .35rem; row-gap: .35rem; }
+                    .ps-pb-btn { padding: .3rem .55rem; font-size: .75rem; }
+                    .ps-pb-save-btn { min-width: 0; flex: 1 1 7rem; }
+                    /* Hide the device-frame toggle on phone · device-frame
+                       previews don't add value when the editor is already
+                       on a phone-shaped viewport. */
+                    .ps-pb-device-toggle { display: none; }
+                    /* Email-meta strip also wraps + tightens. */
+                    .ps-pb-email-meta { grid-template-columns: 1fr !important; gap: .35rem !important; padding: .5rem .65rem !important; }
                     /* Drawer fills the viewport bottom · resize grabber is
                        disabled because pointer events fight touch scroll. */
                     .ps-ne-drawer { height: 80vh !important; }
