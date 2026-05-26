@@ -140,4 +140,19 @@ class NodeHelpers
             'filter' => $current === '' ? $newFilter : $current.' '.$newFilter,
         ];
     }
+
+    /**
+     * Resolve the numeric parameter for a CSS-filter node · prefers
+     * the piped `value` input over the static `value` setting so the
+     * graph composes properly (constant + math + etc. all wire into
+     * brightness / hue-rotate / etc.) and the setting acts as the
+     * fallback when nothing is connected.
+     */
+    public static function filterValue(array $inputs, array $settings, float $default = 1.0): float
+    {
+        if (array_key_exists('value', $inputs) && $inputs['value'] !== null) {
+            return (float) $inputs['value'];
+        }
+        return (float) ($settings['value'] ?? $default);
+    }
 }
