@@ -407,10 +407,9 @@
                             if (! node || rawOffset == null || rawOffset < 0) return rawOffset;
                             const type = block.dataset?.blockType || '';
                             if (type === 'list') {
-                                // Find the <li> ancestor of the caret node ·
-                                // its index among sibling <li>s tells us
-                                // which source line we're on; the offset
-                                // within the li is the in-line offset.
+                                // Find the <li> ancestor of the caret
+                                // position · its index among sibling <li>s
+                                // tells us which source line we're on.
                                 let li = node.nodeType === 3 ? node.parentElement : node;
                                 while (li && li.tagName !== 'LI') li = li.parentElement;
                                 if (! li) return rawOffset;
@@ -421,7 +420,29 @@
                                 for (let i = 0; i < idx; i++) {
                                     preLen += (lis[i].textContent || '').length + 1; // +1 for the source \n
                                 }
-                                return preLen + rawOffset;
+                                // Measure the in-line offset by counting
+                                // characters between the <li>'s start and
+                                // the caret position. Using a Range +
+                                // toString().length works whether the
+                                // browser handed us a (text-node, char)
+                                // pair OR an (element, child-index) pair
+                                // — the latter happens when the caret
+                                // lands past the visible text but still
+                                // inside the <li>'s wider box, and was
+                                // the root cause of "drop at end goes
+                                // mid-word". Cap to the li's own length
+                                // so a caret further down the page
+                                // doesn't overshoot this line.
+                                let inLine = rawOffset;
+                                try {
+                                    const r = document.createRange();
+                                    r.setStart(li, 0);
+                                    r.setEnd(node, Math.min(rawOffset, (node.textContent || '').length));
+                                    inLine = r.toString().length;
+                                } catch (_) {}
+                                const liLen = (li.textContent || '').length;
+                                if (inLine > liLen) inLine = liLen;
+                                return preLen + inLine;
                             }
                             // Default: source is the single text node we
                             // landed on — raw offset matches.
