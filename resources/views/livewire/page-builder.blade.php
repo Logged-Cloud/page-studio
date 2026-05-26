@@ -281,9 +281,9 @@
                                 <button type="button"
                                         class="ps-pb-palette-item"
                                         draggable="true"
-                                        @dragstart.stop="onPaletteDragStart($event, @js($type))"
+                                        @dragstart.stop="onPaletteDragStart($event, @js($type)); closeRailOnMobile()"
                                         @pointerdown="startTouchDrag($event, 'palette', @js($type), @js($def['label']))"
-                                        @click="$wire.addBlock(@js($type))"
+                                        @click="$wire.addBlock(@js($type)); closeRailOnMobile()"
                                         title="Drag onto the canvas or click to append">
                                     <span class="ps-pb-palette-icon">{{ $def['icon'] }}</span>
                                     <span>{{ $def['label'] }}</span>
@@ -310,9 +310,9 @@
                                             class="ps-pb-palette-item"
                                             draggable="true"
                                             wire:key="snip-{{ $s['id'] }}"
-                                            @dragstart.stop="onSnippetDragStart($event, @js($s['name']))"
+                                            @dragstart.stop="onSnippetDragStart($event, @js($s['name'])); closeRailOnMobile()"
                                             @pointerdown="startTouchDrag($event, 'snippet', @js($s['name']), @js($s['label']))"
-                                            @click="$wire.dropSnippet(@js($s['name']))"
+                                            @click="$wire.dropSnippet(@js($s['name'])); closeRailOnMobile()"
                                             :title="@js('Drop ' . $s['label'] . ' · drag onto the canvas or click to append')">
                                         <span class="ps-pb-palette-icon">{{ $s['icon'] }}</span>
                                         <span>{{ $s['label'] }}</span>

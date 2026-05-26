@@ -323,6 +323,17 @@
                         get selectedPath() { return this.$wire.selectedPath; },
                         get segmentCount() { return (this.$wire.blocks || []).length; },
 
+                        // Mobile-only · auto-close the left rail (sheet) after
+                        // the user picks a palette item, either by tap or by
+                        // dragstart. Without this the rail stays in front of
+                        // the canvas covering most of the viewport, so a
+                        // dragged block has nowhere visible to drop.
+                        closeRailOnMobile() {
+                            if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                this.leftCollapsed = true;
+                            }
+                        },
+
                         onPaletteDragStart(e, type) {
                             this.dragKind = 'palette';
                             this.dragPayload = type;
