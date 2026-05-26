@@ -845,6 +845,15 @@
                  "
                  title="Drag to resize the node drawer"></div>
             <header class="ps-ne-drawer-bar">
+                <button type="button"
+                        class="ps-pb-btn ps-ne-palette-toggle"
+                        @click="nodePaletteCollapsed = ! nodePaletteCollapsed"
+                        :aria-pressed="nodePaletteCollapsed ? 'false' : 'true'"
+                        :aria-label="nodePaletteCollapsed ? 'Show node palette' : 'Hide node palette'"
+                        :title="nodePaletteCollapsed ? 'Show palette' : 'Hide palette'">
+                    <span x-show="! nodePaletteCollapsed" aria-hidden="true">◀ Palette</span>
+                    <span x-show="nodePaletteCollapsed" x-cloak aria-hidden="true">▶ Palette</span>
+                </button>
                 <span class="ps-ne-title">Nodes</span>
                 @if ($pendingConnection)
                     <span class="ps-ne-pending">
@@ -906,7 +915,9 @@
             <div class="ps-ne-grid">
                 {{-- ─── LEFT · palette ──────────────────────────────────── --}}
                 <aside class="ps-ne-palette"
-                       x-data="{ query: '' }">
+                       x-data="{ query: '' }"
+                       x-show="! nodePaletteCollapsed"
+                       x-cloak>
                     <input type="search" placeholder="Search…"
                            class="ps-ne-palette-search"
                            x-model="query"
@@ -937,9 +948,11 @@
                                             class="ps-ne-palette-item"
                                             draggable="true"
                                             wire:click="addNode(@js($key))"
+                                            @click="closeNodePaletteOnMobile()"
                                             @dragstart="
                                                 $event.dataTransfer.setData('text/plain', 'ps-ne-palette:' + @js($key));
                                                 $event.dataTransfer.effectAllowed = 'copy';
+                                                closeNodePaletteOnMobile();
                                             "
                                             title="Drag onto the canvas or click to drop at the default spot">
                                         <span class="ps-ne-palette-icon">{{ $def['icon'] }}</span>
