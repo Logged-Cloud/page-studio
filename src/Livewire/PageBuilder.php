@@ -1810,6 +1810,86 @@ class PageBuilder extends Component
     }
 
     /**
+     * Cross-tab live sync · returns the current page's persisted state
+     * if its `updated_at` is strictly newer than $sinceIso, otherwise
+     * null. The Alpine heartbeat polls this every ~8s and merges the
+     * payload into the local Livewire blocks/meta so each tab sees
+     * peer edits without a manual refresh.
+     *
+     * Ephemeral mode is a no-op · there's no row to read against.
+     *
+     * @return array{blocks: array, meta: array, status: string, publishAt: ?string, publishedAt: ?string, updatedAt: string}|null
+     */
+    public function pullCollabUpdates(?string $sinceIso): ?array
+    {
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return null;
+
+        $page = Page::find($pageId);
+        if (! $page || ! $page->updated_at) return null;
+
+        if ($sinceIso !== null && $sinceIso !== '') {
+            try {
+                $since = \Carbon\Carbon::parse($sinceIso);
+                if (! $page->updated_at->greaterThan($since)) return null;
+            } catch (\Throwable $_) {
+                // Unparseable input · treat as "no last-seen" and send.
+            }
+        }
+
+        return [
+            'blocks'      => (array) ($page->blocks ?? []),
+            'meta'        => (array) ($page->meta ?? []),
+            'status'      => (string) ($page->status ?? 'draft'),
+            'publishAt'   => $page->publish_at?->format('Y-m-d\TH:i'),
+            'publishedAt' => $page->published_at?->toIso8601String(),
+            'updatedAt'   => $page->updated_at->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Livewire hook · fires whenever the public $blocks property is
+     * written from the client (every wire:model.live settings edit).
+     * Persists the new tree so peer tabs polling pullCollabUpdates
+     * see the change. Bound-mode only — ephemeral editors have
+     * nothing to persist against.
+     */
+    public function updatedBlocks(): void
+    {
+        $this->livePersist();
+    }
+
+    /**
+     * Livewire hook · same shape as updatedBlocks but for meta
+     * (subject/preheader/SEO fields all use wire:model.live).
+     */
+    public function updatedMeta(): void
+    {
+        $this->livePersist();
+    }
+
+    /**
+     * Minimal DB write driven by the updated* hooks · never dispatches
+     * the "saved" event, never snapshots a revision, never bumps the
+     * activity feed. That weight is reserved for explicit save() calls
+     * (user clicks Save, publish, etc). The point here is to make peer
+     * tabs converge, nothing more.
+     */
+    protected function livePersist(): void
+    {
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return;
+
+        $page = Page::find($pageId);
+        if (! $page) return;
+
+        $page->forceFill([
+            'blocks' => BlockTree::sanitise($this->blocks),
+            'meta'   => $this->meta,
+        ])->save();
+    }
+
+    /**
      * Upsert the current tab's presence row · driven by the same
      * Alpine heartbeat that keeps block-lock expiries fresh.
      */

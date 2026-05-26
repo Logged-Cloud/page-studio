@@ -300,16 +300,29 @@
 
                             // ─── Collaboration heartbeat ───────────────────
                             // Every 8s · refresh whatever block locks the
-                            // current author holds and bump the presence row
-                            // for this tab. Both calls no-op server-side when
-                            // the editor is in ephemeral mode, so we don't
-                            // need to gate the interval here.
-                            this.collabHeartbeat = setInterval(() => {
+                            // current author holds, bump the presence row
+                            // for this tab, AND pull any peer edits that
+                            // landed in the DB since we last looked. All
+                            // three calls no-op server-side in ephemeral
+                            // mode, so we don't need to gate the interval.
+                            this.lastSyncIso = null;
+                            this.collabHeartbeat = setInterval(async () => {
                                 const held = this.heldBlockIds();
                                 if (held.length > 0) {
                                     this.$wire.heartbeatBlockLocks(held);
                                 }
                                 this.$wire.heartbeatPresence();
+                                // Pull peer edits and merge silently if
+                                // no settings input is focused · don't
+                                // clobber whatever the user is typing
+                                // right now.
+                                try {
+                                    const u = await this.$wire.pullCollabUpdates(this.lastSyncIso);
+                                    if (u && u.updatedAt) {
+                                        this.applyCollabUpdate(u);
+                                        this.lastSyncIso = u.updatedAt;
+                                    }
+                                } catch (_) {}
                             }, 8000);
 
                             // Release the lock + presence row on tab close ·
@@ -355,6 +368,75 @@
                         // selected block, but the shape stays an array so a
                         // future multi-select can pass multiple ids without
                         // changing the heartbeat method's signature.
+                        // Silently merge peer edits returned by
+                        // pullCollabUpdates · skipped while an editable
+                        // field is focused so we don't stomp on
+                        // whatever the user is typing right now. Block
+                        // ids the current tab holds a lock on are
+                        // preserved from the local tree (the local
+                        // wire:model.live value is what the user just
+                        // typed; pulling from the DB would erase
+                        // sub-debounce keystrokes).
+                        applyCollabUpdate(u) {
+                            const active = document.activeElement;
+                            const isTyping = active && (
+                                active.tagName === 'INPUT' ||
+                                active.tagName === 'TEXTAREA' ||
+                                active.isContentEditable
+                            );
+                            if (isTyping) return;
+
+                            const heldIds = new Set(this.$wire.heldBlockLockIds || []);
+                            if (heldIds.size === 0) {
+                                this.$wire.set('blocks', u.blocks);
+                            } else {
+                                // Walk both trees and replace each block
+                                // unless the local tab holds its lock.
+                                const localBlocks = JSON.parse(JSON.stringify(this.$wire.blocks || []));
+                                const merged = this.mergeBlocksPreservingHeld(localBlocks, u.blocks, heldIds);
+                                this.$wire.set('blocks', merged);
+                            }
+                            this.$wire.set('meta', u.meta);
+                        },
+
+                        // Walk two parallel trees and return a copy of
+                        // `incoming` with any block whose id is in
+                        // `heldIds` swapped for the local version.
+                        // Preserves child slots recursively · a peer
+                        // edit on the parent doesn't reset the unsaved
+                        // edits the local tab has on a nested child.
+                        mergeBlocksPreservingHeld(local, incoming, heldIds) {
+                            const localById = new Map();
+                            const indexLocal = (list) => {
+                                for (const b of (list || [])) {
+                                    if (b && b.id) localById.set(b.id, b);
+                                    if (b && b.children) {
+                                        for (const k of Object.keys(b.children)) {
+                                            indexLocal(b.children[k]);
+                                        }
+                                    }
+                                }
+                            };
+                            indexLocal(local);
+
+                            const walk = (list) => {
+                                return (list || []).map((b) => {
+                                    if (b && b.id && heldIds.has(b.id) && localById.has(b.id)) {
+                                        return localById.get(b.id);
+                                    }
+                                    if (b && b.children) {
+                                        const out = { ...b, children: { ...b.children } };
+                                        for (const k of Object.keys(out.children)) {
+                                            out.children[k] = walk(out.children[k]);
+                                        }
+                                        return out;
+                                    }
+                                    return b;
+                                });
+                            };
+                            return walk(incoming);
+                        },
+
                         heldBlockIds() {
                             const sel = this.$wire.selectedPath;
                             if (! sel) return [];
