@@ -131,26 +131,23 @@
 
             <div class="ps-pb-device-toggle" role="group" aria-label="Preview device frame">
                 <button type="button"
-                        @click="device = 'desktop'; localStorage.setItem('psPbDevice', 'desktop')"
-                        :class="device === 'desktop' ? 'is-active' : ''"
+                        @click="device = 'phone'; localStorage.setItem('psPbDevice', 'phone')"
+                        :class="device === 'phone' ? 'is-active' : ''"
                         class="ps-pb-device-btn"
-                        :aria-pressed="device === 'desktop' ? 'true' : 'false'"
-                        aria-label="Desktop frame"
-                        title="Desktop">▭</button>
+                        :aria-pressed="device === 'phone' ? 'true' : 'false'"
+                        title="Phone (~390px)">📱 Phone</button>
                 <button type="button"
                         @click="device = 'tablet'; localStorage.setItem('psPbDevice', 'tablet')"
                         :class="device === 'tablet' ? 'is-active' : ''"
                         class="ps-pb-device-btn"
                         :aria-pressed="device === 'tablet' ? 'true' : 'false'"
-                        aria-label="Tablet frame"
-                        title="Tablet (768px)">▢</button>
+                        title="Tablet (~768px)">▭ Tablet</button>
                 <button type="button"
-                        @click="device = 'phone'; localStorage.setItem('psPbDevice', 'phone')"
-                        :class="device === 'phone' ? 'is-active' : ''"
+                        @click="device = 'desktop'; localStorage.setItem('psPbDevice', 'desktop')"
+                        :class="device === 'desktop' ? 'is-active' : ''"
                         class="ps-pb-device-btn"
-                        :aria-pressed="device === 'phone' ? 'true' : 'false'"
-                        aria-label="Phone frame"
-                        title="Phone (390px)">▯</button>
+                        :aria-pressed="device === 'desktop' ? 'true' : 'false'"
+                        title="Desktop">🖥 Desktop</button>
             </div>
 
             <button type="button" wire:click="togglePreview"
@@ -244,17 +241,13 @@
     @endif
 
     @if ($previewMode)
-        <div class="ps-pb-preview-wrap"
-             x-data="{ device: localStorage.getItem('psPbDevice') || 'desktop' }"
-             x-init="$watch('device', v => localStorage.setItem('psPbDevice', v))">
-            <div class="ps-pb-preview-toolbar">
-                <button type="button" :class="device === 'phone'   ? 'is-active' : ''"
-                        @click="device = 'phone'"   title="Phone (375 px)">📱 Phone</button>
-                <button type="button" :class="device === 'tablet'  ? 'is-active' : ''"
-                        @click="device = 'tablet'"  title="Tablet (768 px)">▭ Tablet</button>
-                <button type="button" :class="device === 'desktop' ? 'is-active' : ''"
-                        @click="device = 'desktop'" title="Desktop · full width">🖥 Desktop</button>
-            </div>
+        {{-- Preview pane · reads `device` straight from the page-builder
+             root scope so the topbar's Phone / Tablet / Desktop buttons
+             drive both the edit-canvas frame and the preview pane. The
+             previous in-preview toolbar had its own Alpine scope that
+             didn't sync with the topbar · removed for one source of
+             truth. --}}
+        <div class="ps-pb-preview-wrap">
             <div class="ps-pb-preview-pane"
                  :class="'ps-pb-preview-pane--' + device">
                 @if (empty($blocks))
