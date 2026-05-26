@@ -394,6 +394,39 @@
                         // element so onVarDragLeave can remove it.
                         varDragCaret: null,
                         varDragInsert: { path: '', offset: -1, varName: '' },
+                        // Map a caret (text node + offset-in-node) back to an
+                        // offset within the block's SOURCE field. Necessary
+                        // for blocks whose rendered DOM doesn't match the
+                        // source character-for-character — currently the
+                        // list block (source = "line\nline", DOM = N <li>s).
+                        // Other text-rich blocks (heading / paragraph /
+                        // quote / code / button label / hero) render their
+                        // source as a single text node, so the raw caret
+                        // offset is already the source offset.
+                        mapCaretToSourceOffset(block, node, rawOffset) {
+                            if (! node || rawOffset == null || rawOffset < 0) return rawOffset;
+                            const type = block.dataset?.blockType || '';
+                            if (type === 'list') {
+                                // Find the <li> ancestor of the caret node ·
+                                // its index among sibling <li>s tells us
+                                // which source line we're on; the offset
+                                // within the li is the in-line offset.
+                                let li = node.nodeType === 3 ? node.parentElement : node;
+                                while (li && li.tagName !== 'LI') li = li.parentElement;
+                                if (! li) return rawOffset;
+                                const ul   = li.parentElement;
+                                const lis  = ul ? Array.from(ul.children).filter(c => c.tagName === 'LI') : [li];
+                                const idx  = lis.indexOf(li);
+                                let preLen = 0;
+                                for (let i = 0; i < idx; i++) {
+                                    preLen += (lis[i].textContent || '').length + 1; // +1 for the source \n
+                                }
+                                return preLen + rawOffset;
+                            }
+                            // Default: source is the single text node we
+                            // landed on — raw offset matches.
+                            return rawOffset;
+                        },
                         onVarDragOver(event, path) {
                             // Only act when the drag payload is a var chip
                             // (the strip set application/x-page-studio-var).
@@ -414,17 +447,26 @@
                             const cp = (document.caretPositionFromPoint && document.caretPositionFromPoint(event.clientX, event.clientY))
                                 || (document.caretRangeFromPoint && document.caretRangeFromPoint(event.clientX, event.clientY));
                             if (cp) {
-                                offset = cp.offset ?? cp.startOffset ?? -1;
+                                const rawOffset = cp.offset ?? cp.startOffset ?? -1;
                                 const node = cp.offsetNode || cp.startContainer;
                                 if (node) {
                                     const range = document.createRange();
                                     try {
-                                        range.setStart(node, Math.min(offset, (node.textContent || '').length));
-                                        range.setEnd(node, Math.min(offset, (node.textContent || '').length));
+                                        range.setStart(node, Math.min(rawOffset, (node.textContent || '').length));
+                                        range.setEnd(node, Math.min(rawOffset, (node.textContent || '').length));
                                         const r = range.getBoundingClientRect();
                                         if (r.height) { caretX = r.left; caretY = r.top; }
                                     } catch (_) {}
                                 }
+                                // Convert the text-node-relative caret offset
+                                // into an offset within the BLOCK SOURCE
+                                // (block.settings[fieldKey]). For most blocks
+                                // this is identity (one text node holds the
+                                // whole source). For list blocks, the source
+                                // is line-joined with \n but rendered as N
+                                // separate <li>s — so we sum prior <li> text
+                                // lengths and add a \n per crossed line.
+                                offset = this.mapCaretToSourceOffset(block, node, rawOffset);
                             }
 
                             this.varDragInsert = { path, offset, varName };

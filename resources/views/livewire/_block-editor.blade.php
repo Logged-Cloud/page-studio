@@ -23,6 +23,7 @@
     :class="selectedPath === @js($path) ? 'is-selected' : ''"
     wire:key="block-{{ $block['id'] }}"
     data-block-path="{{ $path }}"
+    data-block-type="{{ $block['type'] }}"
     data-parent-path="{{ $parentPath }}"
     data-slot="{{ $slot === null ? '' : $slot }}"
     data-index="{{ $index }}"

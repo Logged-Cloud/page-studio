@@ -742,12 +742,13 @@ class PageBuilder extends Component
         // share the heading/paragraph naming.
         if ($fieldKey === null) {
             $fieldKey = match ($block['type'] ?? '') {
-                'heading', 'paragraph', 'quote', 'code' => 'text',
-                'button'                                => 'label',
-                'hero'                                  => 'heading',
-                'list'                                  => 'items',
-                'table'                                 => 'html',
-                default                                 => null,
+                'heading', 'paragraph', 'quote' => 'text',
+                'code'                         => 'code',
+                'button'                       => 'label',
+                'hero'                         => 'heading',
+                'list'                         => 'items',
+                'table'                        => 'html',
+                default                        => null,
             };
         }
         if ($fieldKey === null) {
