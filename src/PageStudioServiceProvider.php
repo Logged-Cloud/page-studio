@@ -111,6 +111,7 @@ class PageStudioServiceProvider extends ServiceProvider
             // Sources
             Nodes\Builtin\SourceRouteVariableNode::class,
             Nodes\Builtin\SourceConstantNode::class,
+            Nodes\Builtin\SourceColorNode::class,
             Nodes\Builtin\SourceAuthUserNode::class,
             Nodes\Builtin\SourceAuthIdNode::class,
             Nodes\Builtin\SourceRequestNode::class,
@@ -146,6 +147,7 @@ class PageStudioServiceProvider extends ServiceProvider
             // Image pipeline
             Nodes\Builtin\ImageSourceNode::class,
             Nodes\Builtin\ImageUploadNode::class,
+            Nodes\Builtin\ImageSolidNode::class,
             Nodes\Builtin\ImageBrightnessNode::class,
             Nodes\Builtin\ImageContrastNode::class,
             Nodes\Builtin\ImageSaturateNode::class,

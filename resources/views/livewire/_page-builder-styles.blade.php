@@ -1158,6 +1158,26 @@
                 .ps-pb-var-chip-name { font-weight: 600; }
                 .ps-pb-var-chip-preview { color: var(--ink-dim, #A3A099); font-style: italic; }
 
+                /* ─── Mobile · the strip was cramped on narrow viewports
+                   because every chip carried braces + name + preview +
+                   the "Variables" label ate another 3rem on the left.
+                   Below 768px we drop the label + preview and tighten
+                   the chip padding so a few chips actually fit before
+                   the row has to scroll. */
+                @media (max-width: 768px) {
+                    .ps-pb-var-strip {
+                        padding: .25rem .35rem;
+                        gap: .25rem;
+                    }
+                    .ps-pb-var-strip-label { display: none; }
+                    .ps-pb-var-chip {
+                        padding: .15rem .45rem;
+                        font-size: .7rem;
+                        gap: .15rem;
+                    }
+                    .ps-pb-var-chip-preview { display: none; }
+                }
+
                 /* ─── Node-editor drawer ──────────────────────────────────
                    Fixed-position so a long canvas never pushes the drawer
                    below the fold. The tuck handle (below) is the persistent

@@ -12,7 +12,13 @@ class ImageBlurNode extends NodeType
     public static function icon(): string  { return '◌'; }
     public static function group(): string { return 'image'; }
 
-    public static function inputs(): array  { return ['image' => ['label' => 'Image', 'type' => 'image']]; }
+    public static function inputs(): array
+    {
+        return [
+            'image' => ['label' => 'Image',                  'type' => 'image'],
+            'value' => ['label' => 'Amount (numeric input)', 'type' => 'int'],
+        ];
+    }
     public static function outputs(): array { return ['image' => ['label' => 'Image', 'type' => 'image']]; }
 
     public static function settings(): array
@@ -24,6 +30,7 @@ class ImageBlurNode extends NodeType
 
     public function evaluate(array $inputs, array $settings, array $context): array
     {
-        return ['image' => NodeHelpers::imageFilter($inputs['image'] ?? null, 'blur('.((float) ($settings['value'] ?? 0)).'px)')];
+        $value = NodeHelpers::filterValue($inputs, $settings, 0);
+        return ['image' => NodeHelpers::imageFilter($inputs['image'] ?? null, 'blur('.$value.'px)')];
     }
 }
