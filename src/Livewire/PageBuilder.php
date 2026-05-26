@@ -1735,7 +1735,7 @@ class PageBuilder extends Component
         $pageId = $this->resolvePageId();
         if ($pageId === null) return [];
 
-        [$authorId] = $this->currentAuthor();
+        [$authorId, $authorName] = $this->currentAuthor();
 
         $rows = BlockLock::where('page_id', $pageId)
             ->active()
@@ -1746,9 +1746,16 @@ class PageBuilder extends Component
             // Skip the current user's own locks · the UI is meant to
             // warn ABOUT other people, not the holder themselves.
             if ($row->author_id !== null && $row->author_id === $authorId) continue;
-            // For anonymous holders (author_id null) on the same
-            // session, suppress too · same-tab self-locks shouldn't
-            // ribbon themselves.
+            // Name-fallback · the host app may resolve the SAME human
+            // person to a different author_id in different sessions
+            // (multi-guard, post-login switch, MBR-style admin/front
+            // split). If the lock holder's name matches the viewer's
+            // current name, treat it as the same person so they don't
+            // get locked out of their own work.
+            if ($authorName !== '' && $authorName !== 'Anonymous'
+                && strcasecmp((string) $row->author_name, $authorName) === 0) {
+                continue;
+            }
             $out[$row->block_id] = [
                 'name'       => (string) ($row->author_name ?: 'Someone'),
                 'field'      => (string) ($row->field ?? ''),
@@ -1756,6 +1763,50 @@ class PageBuilder extends Component
             ];
         }
         return $out;
+    }
+
+    /**
+     * Forcibly take over a block that someone else is reported to be
+     * editing · drops the existing lock row and claims a fresh one for
+     * the current user. Used by the "Take over" button on the lock
+     * ribbon when a stale or cross-session lock is blocking a real
+     * collaborator. The takeover is recorded in the activity feed.
+     */
+    public function takeOverBlockLock(string $blockId): bool
+    {
+        $pageId = $this->resolvePageId();
+        if ($pageId === null) return true;
+        [$authorId, $authorName] = $this->currentAuthor();
+
+        $prev = BlockLock::where('page_id', $pageId)
+            ->where('block_id', $blockId)
+            ->first();
+
+        BlockLock::where('page_id', $pageId)
+            ->where('block_id', $blockId)
+            ->delete();
+
+        BlockLock::create([
+            'page_id'     => $pageId,
+            'block_id'    => $blockId,
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'expires_at'  => now()->addSeconds(30),
+        ]);
+
+        Activity::create([
+            'page_id'     => $pageId,
+            'route_id'    => $this->routeId,
+            'verb'        => 'lock_taken_over',
+            'author_id'   => $authorId,
+            'author_name' => $authorName,
+            'payload'     => [
+                'block_id'    => $blockId,
+                'taken_from'  => $prev?->author_name,
+            ],
+        ]);
+
+        return true;
     }
 
     /**

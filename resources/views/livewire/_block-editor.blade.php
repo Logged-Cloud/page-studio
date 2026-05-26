@@ -46,13 +46,25 @@
     @pointerdown="startTouchDrag($event, 'block', @js($path), @js($block['type']))"
 >
     @if ($lockedBy)
-        {{-- Lock ribbon · purely informational, never captures pointer
-             events so the block underneath stays readable / scrollable. --}}
+        {{-- Lock ribbon · informational by default but exposes a
+             "Take over" button so a viewer who knows the lock is stale
+             (own ghost session, departed colleague, etc.) can break it
+             without waiting for the 30s TTL. The button is the only
+             pointer-active element; the rest of the ribbon stays
+             pass-through. --}}
         <div class="ps-pb-lock-ribbon" style="pointer-events:none">
-            🔒 {{ $lockedBy }} editing
-            @if ($lockField !== '')
-                · <em style="font-style:normal;opacity:.85">{{ $lockField }}</em>
-            @endif
+            <span>🔒 {{ $lockedBy }} editing
+                @if ($lockField !== '')
+                    · <em style="font-style:normal;opacity:.85">{{ $lockField }}</em>
+                @endif
+            </span>
+            <button type="button"
+                    class="ps-pb-lock-takeover"
+                    style="pointer-events:auto"
+                    wire:click.stop="takeOverBlockLock(@js($block['id']))"
+                    title="Break the lock and claim this block for yourself">
+                Take over
+            </button>
         </div>
     @endif
 

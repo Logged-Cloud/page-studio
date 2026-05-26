@@ -1938,7 +1938,22 @@
                     border-bottom-right-radius: .25rem;
                     font-weight: 600;
                     letter-spacing: .02em;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .5rem;
                 }
+                .ps-pb-lock-takeover {
+                    background: rgba(255,255,255,.18);
+                    color: #fff;
+                    border: 1px solid rgba(255,255,255,.45);
+                    border-radius: .2rem;
+                    padding: .05rem .35rem;
+                    font: inherit;
+                    font-size: .65rem;
+                    letter-spacing: .02em;
+                    cursor: pointer;
+                }
+                .ps-pb-lock-takeover:hover { background: rgba(255,255,255,.32); }
                 .ps-pb-presence {
                     display: inline-flex;
                     align-items: center;
