@@ -34,12 +34,6 @@ test('icon-only glyphs inside toggle buttons are hidden from assistive tech', fu
     expect(substr_count($this->tpl, 'aria-hidden="true"'))->toBeGreaterThanOrEqual(4);
 });
 
-test('publish-at field has an aria-label since its visible label is emoji-only', function () {
-    expect($this->tpl)
-        ->toContain('aria-label="Publish at (leave empty to publish immediately)"')
-        ->toContain('class="ps-pb-visually-hidden">Publish at');
-});
-
 test('keyboard-shortcuts trigger button carries an aria-label', function () {
     expect($this->tpl)->toContain('aria-label="Show keyboard shortcuts"');
 });

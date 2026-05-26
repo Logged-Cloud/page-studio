@@ -115,14 +115,9 @@
                 </button>
             @endif
 
-            @if ($this->nodeEditorEnabled())
-                <button type="button" wire:click="toggleDrawer"
-                        class="ps-pb-btn ps-pb-nodes-btn"
-                        :class="$wire.drawerOpen ? 'is-active' : ''">
-                    <span class="ps-pb-nodes-icon" aria-hidden="true">⌘</span>
-                    {{ $drawerOpen ? 'Hide nodes' : 'Show nodes' }}
-                </button>
-            @endif
+            {{-- The Show/Hide nodes button moved to the floating tuck
+                 handle at the bottom of the viewport · always visible
+                 without scrolling, regardless of canvas length. --}}
 
             <div class="ps-pb-device-toggle" role="group" aria-label="Preview device frame">
                 <button type="button"
@@ -165,16 +160,10 @@
             <span class="ps-pb-status-badge ps-pb-status-badge--{{ $badgeKind }}"
                   title="Lifecycle state">{{ $badgeLabel }}</span>
 
-            {{-- Optional scheduled publish · datetime-local picker --}}
-            <label class="ps-pb-publish-at"
-                   title="Publish at (leave empty to publish immediately when you click Publish)">
-                <span class="ps-pb-publish-at-label" aria-hidden="true">⏲</span>
-                <span class="ps-pb-visually-hidden">Publish at</span>
-                <input type="datetime-local"
-                       wire:model.live="publishAt"
-                       aria-label="Publish at (leave empty to publish immediately)"
-                       class="ps-pb-publish-at-input">
-            </label>
+            {{-- The scheduled-publish datetime-local picker was dropped
+                 from the topbar · authors who need scheduled publishing
+                 can set page->publish_at programmatically. Keeping the
+                 publishAt server property intact for backward compat. --}}
 
             @if ($status === 'published')
                 <button type="button"
@@ -826,8 +815,28 @@
     @endif
 
     {{-- ─── Bottom drawer · node variable editor ───────────────────────────── --}}
+    {{-- Tuck handle · always-visible bottom-pill that opens / closes the
+         node drawer. Mirrors the logged-cloud/navigation chrome's tuck
+         pattern: one persistent affordance, no scrolling needed to find
+         it on a tall canvas. Hidden in preview mode where the editor
+         chrome itself disappears. --}}
+    @if (! $previewMode && $this->nodeEditorEnabled())
+        <button type="button"
+                class="ps-ne-tuck-handle"
+                wire:click="toggleDrawer"
+                :class="$wire.drawerOpen ? 'is-open' : ''"
+                :aria-expanded="$wire.drawerOpen ? 'true' : 'false'"
+                aria-controls="ps-ne-drawer-region"
+                :aria-label="$wire.drawerOpen ? 'Hide variables modifier' : 'Show variables modifier'"
+                :title="$wire.drawerOpen ? 'Tuck variables modifier' : 'Show variables modifier'">
+            <span class="ps-ne-tuck-grip" aria-hidden="true"></span>
+            <span class="ps-ne-tuck-label">⌘ Variables Modifier</span>
+        </button>
+    @endif
+
     @if ($drawerOpen && ! $previewMode)
         <section class="ps-ne-drawer"
+                 id="ps-ne-drawer-region"
                  data-component="page-studio.node-editor"
                  x-data="{ height: parseInt(localStorage.getItem('psPbDrawerH') || '352') }"
                  x-init="$watch('height', v => localStorage.setItem('psPbDrawerH', String(v)))"
@@ -854,7 +863,7 @@
                     <span x-show="! nodePaletteCollapsed" aria-hidden="true">◀ Palette</span>
                     <span x-show="nodePaletteCollapsed" x-cloak aria-hidden="true">▶ Palette</span>
                 </button>
-                <span class="ps-ne-title">Nodes</span>
+                <span class="ps-ne-title">Variables Modifier</span>
                 @if ($pendingConnection)
                     <span class="ps-ne-pending">
                         Wiring from
@@ -912,7 +921,10 @@
                 </div>
             </header>
 
-            <div class="ps-ne-grid">
+            <div class="ps-ne-grid"
+                 :class="{
+                    'ps-ne-grid--palette-closed': nodePaletteCollapsed,
+                 }">
                 {{-- ─── LEFT · palette ──────────────────────────────────── --}}
                 <aside class="ps-ne-palette"
                        x-data="{ query: '' }"
