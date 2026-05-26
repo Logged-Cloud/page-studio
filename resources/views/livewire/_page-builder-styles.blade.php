@@ -131,6 +131,12 @@
                     min-height: 0;
                     overflow: hidden;
                     transition: grid-template-columns .15s ease;
+                    /* Reserve viewport room for the fixed Variables Modifier
+                       drawer when it's open · without this the bottom of the
+                       left rail (block palette) and the canvas slide UNDER
+                       the drawer rather than alongside it. */
+                    padding-bottom: var(--ps-pb-drawer-h, 0);
+                    box-sizing: border-box;
                 }
                 .ps-pb-grid.is-left-collapsed  { grid-template-columns: 0 1fr var(--rail-w); }
                 .ps-pb-grid.is-right-collapsed { grid-template-columns: var(--rail-w) 1fr 0; }

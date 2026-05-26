@@ -8,6 +8,10 @@
     @keydown.window.alt.up.prevent="if ($wire.selectedPath) $wire.moveSelectedBlock(-1)"
     @keydown.window.alt.down.prevent="if ($wire.selectedPath) $wire.moveSelectedBlock(1)"
     class="ps-page-builder"
+    x-effect="
+        const h = $wire.drawerOpen ? (parseInt(localStorage.getItem('psPbDrawerH') || '352')) : 0;
+        document.documentElement.style.setProperty('--ps-pb-drawer-h', h + 'px');
+    "
     data-component="page-studio.page-builder"
 >
     {{-- ─── Top bar · rail toggles + route info + preview / save ───────────── --}}
@@ -839,7 +843,15 @@
                  id="ps-ne-drawer-region"
                  data-component="page-studio.node-editor"
                  x-data="{ height: parseInt(localStorage.getItem('psPbDrawerH') || '352') }"
-                 x-init="$watch('height', v => localStorage.setItem('psPbDrawerH', String(v)))"
+                 x-init="
+                    // Sync the var on mount so a freshly-opened drawer
+                    // already reserves grid space.
+                    document.documentElement.style.setProperty('--ps-pb-drawer-h', height + 'px');
+                    $watch('height', v => {
+                        localStorage.setItem('psPbDrawerH', String(v));
+                        document.documentElement.style.setProperty('--ps-pb-drawer-h', v + 'px');
+                    });
+                 "
                  :style="`height:${height}px`">
             {{-- Grabber · drag up/down to resize the drawer. --}}
             <div class="ps-ne-grabber"
