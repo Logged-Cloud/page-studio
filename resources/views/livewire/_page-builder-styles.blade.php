@@ -1596,6 +1596,57 @@
                 }
                 .ps-ne-socket-row--in  { padding-left: 0; padding-right: .55rem; }
                 .ps-ne-socket-row--out { padding-left: .55rem; padding-right: 0; justify-content: flex-end; }
+
+                /* ─── On-node settings rows (Blender-style) ──────
+                   Each settable field renders as a row with a socket
+                   pip on the left, a label, and the input control on
+                   the right. When wired (.is-wired) the control fades
+                   out and the pip lights up. */
+                .ps-ne-setting-row {
+                    display: grid;
+                    grid-template-columns: .65rem 1fr minmax(5rem, auto);
+                    align-items: center;
+                    gap: .5rem;
+                    padding: .15rem .35rem .15rem 0;
+                    font-size: .72rem;
+                    border-top: 1px solid color-mix(in srgb, var(--line, #3A3D40) 60%, transparent);
+                }
+                .ps-ne-setting-row:first-of-type { border-top: none; }
+                .ps-ne-setting-row.is-wired .ps-ne-socket { background: var(--accent, #2C66E8); }
+                .ps-ne-setting-label {
+                    color: var(--ink-dim, #A3A099);
+                    text-transform: none;
+                    letter-spacing: 0;
+                    font-size: .7rem;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .ps-ne-setting-control { display: inline-flex; align-items: center; gap: .25rem; }
+                .ps-ne-setting-control input[type="text"],
+                .ps-ne-setting-control input[type="number"],
+                .ps-ne-setting-control select,
+                .ps-ne-setting-control textarea {
+                    background: var(--surface, #16171a);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .25rem;
+                    padding: .15rem .35rem;
+                    font: inherit;
+                    font-size: .7rem;
+                    min-width: 4.5rem;
+                    width: 100%;
+                    max-width: 9rem;
+                }
+                .ps-ne-setting-control input[type="color"] {
+                    width: 1.5rem; height: 1.1rem; padding: 0; border: 1px solid var(--line, #3A3D40); border-radius: .25rem;
+                    background: transparent;
+                }
+                .ps-ne-socket--placeholder {
+                    visibility: hidden;
+                    pointer-events: none;
+                    cursor: default;
+                }
                 .ps-ne-socket {
                     width: .65rem;
                     height: .65rem;

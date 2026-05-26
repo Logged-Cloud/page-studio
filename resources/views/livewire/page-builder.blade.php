@@ -1112,8 +1112,36 @@
                     @foreach ($nodes as $i => $node)
                         @php
                             $schema = (config('page-studio.nodes', []))[$node['type']] ?? [];
+                            // Class-defined nodes can override settings dynamically based on the
+                            // current instance · e.g. Model finder's finder_key becomes a select
+                            // sourced from the selected model's findBy. Merge per-field so the
+                            // rest of the static schema stays intact.
+                            if (! empty($schema['class']) && class_exists($schema['class'])) {
+                                try {
+                                    $nodeInstance = new ($schema['class'])();
+                                    if (method_exists($nodeInstance, 'dynamicSettings')) {
+                                        $dynamic = $nodeInstance->dynamicSettings($node);
+                                        if (is_array($dynamic) && ! empty($schema['settings'])) {
+                                            foreach ($dynamic as $dKey => $dDef) {
+                                                $schema['settings'][$dKey] = array_merge(
+                                                    $schema['settings'][$dKey] ?? [],
+                                                    $dDef,
+                                                );
+                                            }
+                                        }
+                                    }
+                                } catch (\Throwable $_) {}
+                            }
                             $isNote = ($schema['group'] ?? '') === 'note';
                             $liveOutputs = ($this->nodeSocketValues)[$node['id']] ?? [];
+                            // Skip duplicate input rows for fields that also exist as
+                            // settings · the settings section now carries the wireable pip
+                            // for those, so showing one in inputs too is a confusing
+                            // double-pip on the same socket name.
+                            $settingsKeys = array_keys($schema['settings'] ?? []);
+                            $renderedInputs = collect($schema['inputs'] ?? [])
+                                ->reject(fn ($_, $key) => in_array($key, $settingsKeys, true))
+                                ->all();
                         @endphp
                         <div
                             class="ps-ne-node{{ $isNote ? ' ps-ne-node--note' : '' }} ps-ne-node--group-{{ $schema['group'] ?? 'source' }}{{ ! empty($node['muted']) ? ' is-muted' : '' }}"
@@ -1167,8 +1195,11 @@
                                 <div class="ps-ne-node-note">{{ $node['settings']['text'] ?? '' }}</div>
                             @else
                                 <div class="ps-ne-node-body">
-                                    {{-- Inputs · click to complete a pending connection --}}
-                                    @foreach ($schema['inputs'] ?? [] as $key => $entry)
+                                    {{-- Inputs · click to complete a pending connection.
+                                         Fields that also exist in settings are rendered as
+                                         pips in the settings section below instead, so a
+                                         socket name only ever has ONE visual pip. --}}
+                                    @foreach ($renderedInputs as $key => $entry)
                                         @php $sock = \LoggedCloud\PageStudio\Support\NodeSchema::normaliseSocket($entry); @endphp
                                         <div class="ps-ne-socket-row ps-ne-socket-row--in">
                                             <button type="button"
@@ -1236,6 +1267,82 @@
                                             </div>
                                         @endif
                                     @endforeach
+
+                                    {{-- ─── Settings rows (Blender-style) ───
+                                         Each settable field renders directly on
+                                         the node card. A socket pip on the left
+                                         lets authors PROMOTE the field to a
+                                         wired input · when wired, the static
+                                         control is disabled and the engine
+                                         routes the wired value into evaluate()
+                                         via the settings-as-implicit-inputs
+                                         merge. --}}
+                                    @if (! empty($schema['settings']))
+                                        @foreach ($schema['settings'] as $sKey => $sDef)
+                                            @php
+                                                $kind = $sDef['kind'] ?? 'text';
+                                                // Every setting carries a wireable pip · selects and
+                                                // uploads included. When the row is wired the static
+                                                // control still renders but is dimmed; the engine
+                                                // merges the wired value into evaluate() either way.
+                                                $sockType   = match (true) {
+                                                    in_array($kind, ['number'], true)  => 'int',
+                                                    in_array($kind, ['bool'], true)    => 'bool',
+                                                    in_array($kind, ['color'], true)   => 'color',
+                                                    default                            => 'string',
+                                                };
+                                                $modelPath = "nodes.$i.settings.$sKey";
+                                                $wireExpr  = "(\$wire.edges || []).some(e => e.to_node === '".$node['id']."' && e.to_socket === '".$sKey."')";
+                                            @endphp
+                                            <div class="ps-ne-setting-row"
+                                                 wire:key="ne-setting-{{ $node['id'] }}-{{ $sKey }}"
+                                                 :class="{{ $wireExpr }} ? 'is-wired' : ''">
+                                                <button type="button"
+                                                        class="ps-ne-socket ps-ne-socket--in ps-ne-socket--type-{{ $sockType }}"
+                                                        data-socket-node="{{ $node['id'] }}"
+                                                        data-socket-key="{{ $sKey }}"
+                                                        data-socket-kind="in"
+                                                        data-socket-type="{{ $sockType }}"
+                                                        wire:click.stop="completeConnection(@js($node['id']), @js($sKey))"
+                                                        title="{{ $sDef['label'] ?? $sKey }} · wire-in to override"></button>
+
+                                                <label class="ps-ne-setting-label">{{ $sDef['label'] ?? $sKey }}</label>
+
+                                                <span class="ps-ne-setting-control" :style="{{ $wireExpr }} ? 'opacity:.4;pointer-events:none' : ''">
+                                                    @if ($kind === 'select')
+                                                        <select wire:model.live="{{ $modelPath }}">
+                                                            @foreach ($sDef['options'] ?? [] as $val => $lbl)
+                                                                <option value="{{ $val }}">{{ $lbl }}</option>
+                                                            @endforeach
+                                                        </select>
+                                                    @elseif ($kind === 'number')
+                                                        <input type="number" step="any"
+                                                               wire:model.live.debounce.300ms="{{ $modelPath }}">
+                                                    @elseif ($kind === 'bool')
+                                                        <input type="checkbox" wire:model.live="{{ $modelPath }}">
+                                                    @elseif ($kind === 'color')
+                                                        <input type="color" wire:model.live="{{ $modelPath }}">
+                                                    @elseif ($kind === 'upload')
+                                                        @php $val = data_get($this, $modelPath); @endphp
+                                                        @if (! empty($val))
+                                                            <button type="button" class="ps-pb-btn"
+                                                                    wire:click="clearUpload(@js($modelPath))">Replace</button>
+                                                        @else
+                                                            <input type="file" accept="image/*"
+                                                                   @click="$wire.set('uploadTargetProp', @js($modelPath))"
+                                                                   wire:model="uploadFile">
+                                                        @endif
+                                                    @elseif ($kind === 'textarea')
+                                                        <textarea rows="2"
+                                                                  wire:model.live.debounce.300ms="{{ $modelPath }}"></textarea>
+                                                    @else
+                                                        <input type="text"
+                                                               wire:model.live.debounce.300ms="{{ $modelPath }}">
+                                                    @endif
+                                                </span>
+                                            </div>
+                                        @endforeach
+                                    @endif
                                 </div>
                             @endif
                         </div>
@@ -1357,79 +1464,11 @@
                     </div>
                 </div>
 
-                {{-- ─── RIGHT · node settings · only rendered while a node is selected ─── --}}
-                @if ($this->selectedNode)
-                <aside class="ps-ne-settings"
-                       wire:key="ne-settings-{{ $this->selectedNodeId }}">
-                    <button type="button"
-                            class="ps-ne-rail-grabber ps-ne-rail-grabber--left"
-                            @pointerdown="startRailResize($event, 'neRight')"
-                            aria-label="Resize node settings rail"
-                            title="Drag to resize"></button>
-                    <h3>Node settings</h3>
-                    @if (true)
-                        @php $node = $this->selectedNode; $schema = $this->selectedNodeSchema; $prefix = $this->selectedNodeSettingsPrefix(); @endphp
-                        <p class="ps-pb-hint">Editing <code>{{ $node['type'] }}</code></p>
-                        @if (empty($schema['settings']))
-                            <p class="ps-pb-hint">No editable settings.</p>
-                        @else
-                            @foreach ($schema['settings'] as $key => $def)
-                                {{-- wire:key includes the selected node id so
-                                     Livewire force-remounts the input element
-                                     when selection switches between two nodes
-                                     of the same type · prevents the previous
-                                     wire:model path from sticking around in
-                                     the morphed DOM and writing to the
-                                     wrong node. --}}
-                                <div class="ps-pb-field"
-                                     wire:key="ne-field-{{ $this->selectedNodeId }}-{{ $key }}">
-                                    <label>
-                                        {{ $def['label'] ?? $key }}
-                                        @if (($def['kind'] ?? 'text') === 'number')
-                                            <span class="ps-pb-hint" style="text-transform:none">· drag to scrub</span>
-                                        @endif
-                                    </label>
-                                    @if (($def['kind'] ?? 'text') === 'select')
-                                        <select wire:model.live="{{ $prefix.$key }}">
-                                            @foreach ($def['options'] ?? [] as $val => $lbl)
-                                                <option value="{{ $val }}">{{ $lbl }}</option>
-                                            @endforeach
-                                        </select>
-                                    @elseif (($def['kind'] ?? 'text') === 'number')
-                                        <input type="number" step="any"
-                                               wire:model.live.debounce.300ms="{{ $prefix.$key }}">
-                                    @elseif (($def['kind'] ?? 'text') === 'bool')
-                                        <label class="ps-pb-checkbox">
-                                            <input type="checkbox" wire:model.live="{{ $prefix.$key }}">
-                                            <span>{{ $def['help'] ?? 'Enable' }}</span>
-                                        </label>
-                                    @elseif (($def['kind'] ?? 'text') === 'upload')
-                                        @php $val = data_get($this, $prefix.$key); @endphp
-                                        @if (! empty($val))
-                                            <div class="ps-pb-upload-preview">
-                                                <img src="{{ $val }}" alt="upload preview">
-                                                <button type="button"
-                                                        class="ps-pb-btn"
-                                                        wire:click="clearUpload(@js($prefix.$key))">Replace</button>
-                                            </div>
-                                        @else
-                                            <input type="file" accept="image/*"
-                                                   @click="$wire.set('uploadTargetProp', @js($prefix.$key))"
-                                                   wire:model="uploadFile">
-                                            <div wire:loading wire:target="uploadFile"
-                                                 class="ps-pb-hint" style="text-transform:none">Uploading…</div>
-                                            <p class="ps-pb-hint" style="text-transform:none">Stored on the configured Laravel disk; the node emits the public URL.</p>
-                                        @endif
-                                    @else
-                                        <input type="text"
-                                               wire:model.live.debounce.300ms="{{ $prefix.$key }}">
-                                    @endif
-                                </div>
-                            @endforeach
-                        @endif
-                    @endif
-                </aside>
-                @endif
+                {{-- Right-rail Node Settings used to live here · removed in the
+                     on-node settings refactor (Blender-style). Each settable
+                     field now renders inside its node card with a wireable
+                     socket pip on the left, see the @foreach ($nodes) loop
+                     above. --}}
             </div>
         </section>
     @endif
