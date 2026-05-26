@@ -734,12 +734,30 @@ class PageBuilder extends Component
         $block = BlockTree::get($this->blocks, $path);
         if (! $block) return;
 
-        $fieldKey ??= match ($block['type'] ?? '') {
-            'heading', 'paragraph', 'quote', 'code'   => 'text',
-            'button'                                  => 'label',
-            'hero'                                    => 'heading',
-            default                                   => 'text',
-        };
+        // Resolve the text-bearing setting on this block · per-type
+        // overrides cover the common case; anything else walks the
+        // block's settings schema and picks the first 'text' or
+        // 'textarea' kind field. That covers list ('items'), table
+        // ('rows'), code ('text'), and any custom blocks that don't
+        // share the heading/paragraph naming.
+        if ($fieldKey === null) {
+            $fieldKey = match ($block['type'] ?? '') {
+                'heading', 'paragraph', 'quote', 'code' => 'text',
+                'button'                                => 'label',
+                'hero'                                  => 'heading',
+                'list'                                  => 'items',
+                'table'                                 => 'html',
+                default                                 => null,
+            };
+        }
+        if ($fieldKey === null) {
+            $schema = config('page-studio.blocks.'.($block['type'] ?? '').'.settings', []);
+            foreach ($schema as $key => $def) {
+                $kind = $def['kind'] ?? 'text';
+                if ($kind === 'text' || $kind === 'textarea') { $fieldKey = $key; break; }
+            }
+        }
+        if ($fieldKey === null) return;
 
         $current = (string) ($block['settings'][$fieldKey] ?? '');
         $token   = '{{ '.$varName.' }}';
