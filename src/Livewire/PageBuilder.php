@@ -240,7 +240,19 @@ class PageBuilder extends Component
         $this->publishAt   = $page?->publish_at?->format('Y-m-d\TH:i');
         $this->publishedAt = $page?->published_at?->toIso8601String();
 
-        $graph = $routeId !== null ? NodeGraph::where('route_id', $routeId)->first() : null;
+        // Resolve the node-graph route_id · the caller may pass it
+        // directly (the legacy /pages/{route}/edit shape), but a host
+        // app that mounts by pageId (e.g. studio.logged.cloud's
+        // playground) wouldn't have one to hand. Fall back to the
+        // page's own route_id so the graph follows the page row in
+        // both modes. Without this, the Variables Modifier comes up
+        // empty even when the graph rows are sitting right there in
+        // the DB.
+        $graphRouteId = $routeId ?? $page?->route_id;
+        if ($graphRouteId !== null && $this->routeId === null) {
+            $this->routeId = $graphRouteId;
+        }
+        $graph = $graphRouteId !== null ? NodeGraph::where('route_id', $graphRouteId)->first() : null;
         $this->nodes = $graph ? (array) $graph->nodes : [];
         $this->edges = $graph ? (array) $graph->edges : [];
 
