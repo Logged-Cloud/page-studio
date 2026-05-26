@@ -238,7 +238,7 @@
                 }
                 .ps-pb-rail--left   { border-right: 1px solid var(--line, #3A3D40); grid-area: left; }
                 .ps-pb-rail--right  { border-left:  1px solid var(--line, #3A3D40); grid-area: right; }
-                .ps-pb-canvas-wrap  { grid-area: canvas; background: var(--surface, #16171a); padding: 1.25rem; overflow-y: auto; }
+                .ps-pb-canvas-wrap  { grid-area: canvas; background: var(--surface, #16171a); padding: 1.25rem 1.25rem 4rem; overflow-y: auto; }
                 /* Device-frame previews · the canvas is centred and its
                    max-width is clamped to a typical viewport size for that
                    form factor. Pure visual constraint, no responsive CSS
@@ -1011,14 +1011,63 @@
                     flex: 1;
                 }
 
-                /* ─── Node-editor drawer ────────────────────────────────── */
+                /* ─── Node-editor drawer ──────────────────────────────────
+                   Fixed-position so a long canvas never pushes the drawer
+                   below the fold. The tuck handle (below) is the persistent
+                   affordance to open / close it · same pattern as the
+                   logged-cloud/navigation chrome's tuck. */
                 .ps-ne-drawer {
-                    position: relative;
+                    position: fixed;
+                    left: 0; right: 0; bottom: 0;
+                    z-index: 60;
                     flex-shrink: 0;
                     background: var(--surface-2, #1E1F22);
                     border-top: 1px solid var(--line, #3A3D40);
                     display: flex;
                     flex-direction: column;
+                    box-shadow: 0 -8px 32px rgba(0,0,0,.35);
+                }
+
+                /* ─── Tuck handle ─────────────────────────────────────────
+                   Always-visible pill at the bottom-centre of the viewport,
+                   z-indexed above the drawer so the user can re-tap to
+                   close. When the drawer is closed the handle sits a couple
+                   of px above the floor; when open it slides up along with
+                   the drawer's top edge so the tap target stays near where
+                   the eye is. */
+                .ps-ne-tuck-handle {
+                    position: fixed;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    bottom: 12px;
+                    z-index: 65;
+                    background: var(--surface-2, #1E1F22);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: 999px;
+                    padding: .35rem .9rem .35rem .65rem;
+                    font: inherit;
+                    font-size: .8rem;
+                    cursor: pointer;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .45rem;
+                    box-shadow: 0 6px 20px rgba(0,0,0,.45);
+                    backdrop-filter: blur(8px);
+                    transition: background-color .15s, border-color .15s, transform .15s;
+                }
+                .ps-ne-tuck-handle:hover {
+                    background: color-mix(in srgb, var(--accent, #2C66E8) 18%, var(--surface-2, #1E1F22));
+                    border-color: color-mix(in srgb, var(--accent, #2C66E8) 40%, var(--line, #3A3D40));
+                }
+                /* When the drawer is open the handle hides · the drawer's
+                   own header carries the close button, and overlapping the
+                   handle with the drawer header looks busy. */
+                .ps-ne-tuck-handle.is-open { display: none; }
+                .ps-ne-tuck-grip {
+                    width: 28px; height: 4px; border-radius: 2px;
+                    background: var(--ink-dim, #A3A099);
+                    display: inline-block;
                 }
                 .ps-ne-grabber {
                     position: absolute;
@@ -1072,6 +1121,17 @@
                     flex: 1;
                     min-height: 0;
                 }
+                /* When the palette is collapsed via the toggle, drop its
+                   column so the canvas reclaims the freed width · without
+                   this the centre track stays at 1fr alongside an empty
+                   10rem cell, making the canvas look squeezed to the left. */
+                .ps-ne-grid--palette-closed {
+                    grid-template-columns: 1fr 14rem;
+                }
+                .ps-ne-grid--palette-closed:not(:has(.ps-ne-settings)) {
+                    grid-template-columns: 1fr;
+                }
+
                 /* When the settings aside is removed (no node selected) the
                    centre canvas reclaims the freed column. */
                 .ps-ne-grid:not(:has(.ps-ne-settings)) {
