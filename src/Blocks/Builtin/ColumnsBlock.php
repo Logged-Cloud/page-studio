@@ -48,10 +48,16 @@ class ColumnsBlock extends BlockType
         $left  = PageRenderer::renderChildren($children, 'left',  $context, $decorate);
         $right = PageRenderer::renderChildren($children, 'right', $context, $decorate);
 
+        // Inline @media query so the two columns stack on phones without
+        // requiring host-app CSS overrides. Multiple columns blocks on
+        // one page emit identical <style> tags · browsers dedupe by
+        // content, the cost is negligible.
+        $responsive = '<style>@media (max-width: 640px) { .ps-render-cols-2 { grid-template-columns: 1fr !important; gap: 1.5rem !important; } }</style>';
+
         return sprintf(
-            '<div style="display:grid;grid-template-columns:%s;gap:%s;margin:.65em 0">'
+            '%s<div class="ps-render-cols-2" style="display:grid;grid-template-columns:%s;gap:%s;margin:.65em 0">'
                 .'<div>%s</div><div>%s</div></div>',
-            $grid, $gap, $left, $right,
+            $responsive, $grid, $gap, $left, $right,
         );
     }
 

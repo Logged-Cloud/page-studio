@@ -40,10 +40,15 @@ class ColumnsThreeBlock extends BlockType
         $middle = PageRenderer::renderChildren($children, 'middle', $context, $decorate);
         $right  = PageRenderer::renderChildren($children, 'right',  $context, $decorate);
 
+        // Inline @media query so the three columns stack on phones and
+        // pair up on tablets. Browsers dedupe identical <style> blocks
+        // so emitting one per block is cheap.
+        $responsive = '<style>@media (max-width: 880px) { .ps-render-cols-3 { grid-template-columns: 1fr 1fr !important; } } @media (max-width: 640px) { .ps-render-cols-3 { grid-template-columns: 1fr !important; gap: 1.5rem !important; } }</style>';
+
         return sprintf(
-            '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:%s;margin:.65em 0">'
+            '%s<div class="ps-render-cols-3" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:%s;margin:.65em 0">'
                 .'<div>%s</div><div>%s</div><div>%s</div></div>',
-            $gap, $left, $middle, $right,
+            $responsive, $gap, $left, $middle, $right,
         );
     }
 
