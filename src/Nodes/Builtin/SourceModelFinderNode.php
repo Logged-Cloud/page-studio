@@ -39,6 +39,33 @@ class SourceModelFinderNode extends NodeType
         return $outputs;
     }
 
+    /**
+     * Per-model finder_key dropdown · sourced from the selected
+     * model's #[ExposeToModelFinder(findBy: [...])] declaration. If
+     * no model is selected, or the selected model didn't list any
+     * findBy columns, fall through to the static text-field default.
+     */
+    public function dynamicSettings(array $node): ?array
+    {
+        $class = trim((string) ($node['settings']['model_class'] ?? ''));
+        if ($class === '') return null;
+
+        $rec = \LoggedCloud\PageStudio\Support\ModelDiscovery::record($class);
+        if (! $rec || empty($rec['findBy'])) return null;
+
+        $options = [];
+        foreach ($rec['findBy'] as $col) $options[$col] = $col;
+
+        return [
+            'finder_key' => [
+                'kind'    => 'select',
+                'label'   => 'Find by column',
+                'default' => $rec['findBy'][0],
+                'options' => $options,
+            ],
+        ];
+    }
+
     public function evaluate(array $inputs, array $settings, array $context): array
     {
         $class  = trim((string) ($settings['model_class'] ?? ''));
