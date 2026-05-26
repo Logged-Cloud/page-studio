@@ -12,6 +12,12 @@
         const h = $wire.drawerOpen ? (parseInt(localStorage.getItem('psPbDrawerH') || '352')) : 0;
         document.documentElement.style.setProperty('--ps-pb-drawer-h', h + 'px');
     "
+    x-init="
+        $watch('leftRailW',    v => localStorage.setItem('psPbLeftRailW',    String(v)));
+        $watch('rightRailW',   v => localStorage.setItem('psPbRightRailW',   String(v)));
+        $watch('neLeftRailW',  v => localStorage.setItem('psPbNeLeftRailW',  String(v)));
+        $watch('neRightRailW', v => localStorage.setItem('psPbNeRightRailW', String(v)));
+    "
     data-component="page-studio.page-builder"
 >
     {{-- ─── Top bar · rail toggles + route info + preview / save ───────────── --}}
@@ -261,11 +267,17 @@
     @else
         <div class="ps-pb-grid"
              :class="(leftCollapsed ? 'is-left-collapsed ' : '')
-                + ((rightCollapsed || (! $wire.selectedPath && ! $wire.selectedNodeId)) ? 'is-right-collapsed' : '')">
+                + ((rightCollapsed || (! $wire.selectedPath && ! $wire.selectedNodeId)) ? 'is-right-collapsed' : '')"
+             :style="`--rail-l: ${leftRailW}px; --rail-r: ${rightRailW}px`">
 
             {{-- ─── LEFT · components grouped + variables panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--left"
                    x-show="! leftCollapsed" x-cloak>
+                <button type="button"
+                        class="ps-pb-rail-grabber ps-pb-rail-grabber--right"
+                        @pointerdown="startRailResize($event, 'left')"
+                        aria-label="Resize components rail"
+                        title="Drag to resize"></button>
                 @foreach ($this->blockLibrary as $group => $items)
                     <section class="ps-pb-section">
                         <h3>{{ ucfirst($group) }}</h3>
@@ -426,6 +438,11 @@
             {{-- ─── RIGHT · settings + comments + activity panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--right"
                    x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId || ['comments','activity','seo','a11y'].includes(rightTab))" x-cloak>
+                <button type="button"
+                        class="ps-pb-rail-grabber ps-pb-rail-grabber--left"
+                        @pointerdown="startRailResize($event, 'right')"
+                        aria-label="Resize settings rail"
+                        title="Drag to resize"></button>
 
                 {{-- Tab strip · Settings / Comments / Activity all share the
                      rail. Selecting a non-Settings tab keeps the rail open
@@ -973,12 +990,18 @@
             <div class="ps-ne-grid"
                  :class="{
                     'ps-ne-grid--palette-closed': nodePaletteCollapsed,
-                 }">
+                 }"
+                 :style="`--ne-rail-l: ${neLeftRailW}px; --ne-rail-r: ${neRightRailW}px`">
                 {{-- ─── LEFT · palette ──────────────────────────────────── --}}
                 <aside class="ps-ne-palette"
                        x-data="{ query: '' }"
                        x-show="! nodePaletteCollapsed"
                        x-cloak>
+                    <button type="button"
+                            class="ps-ne-rail-grabber ps-ne-rail-grabber--right"
+                            @pointerdown="startRailResize($event, 'neLeft')"
+                            aria-label="Resize node palette"
+                            title="Drag to resize"></button>
                     <input type="search" placeholder="Search…"
                            class="ps-ne-palette-search"
                            x-model="query"
@@ -1336,6 +1359,11 @@
                 {{-- ─── RIGHT · node settings · only rendered while a node is selected ─── --}}
                 @if ($this->selectedNode)
                 <aside class="ps-ne-settings">
+                    <button type="button"
+                            class="ps-ne-rail-grabber ps-ne-rail-grabber--left"
+                            @pointerdown="startRailResize($event, 'neRight')"
+                            aria-label="Resize node settings rail"
+                            title="Drag to resize"></button>
                     <h3>Node settings</h3>
                     @if (true)
                         @php $node = $this->selectedNode; $schema = $this->selectedNodeSchema; $prefix = $this->selectedNodeSettingsPrefix(); @endphp

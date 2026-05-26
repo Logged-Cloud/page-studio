@@ -230,6 +230,41 @@
                         nodePaletteCollapsed: (typeof window !== 'undefined' && window.innerWidth <= 768)
                             ? true
                             : localStorage.getItem('psPbNodePaletteCollapsed') === '1',
+                        // Rail widths · authors drag the inner edge of a
+                        // rail to resize it. Pixel values, persisted to
+                        // localStorage, clamped 120-540 by the drag handler.
+                        // Defaults align with the historical CSS vars.
+                        leftRailW:    parseInt(localStorage.getItem('psPbLeftRailW')    || '144'),
+                        rightRailW:   parseInt(localStorage.getItem('psPbRightRailW')   || '224'),
+                        neLeftRailW:  parseInt(localStorage.getItem('psPbNeLeftRailW')  || '160'),
+                        neRightRailW: parseInt(localStorage.getItem('psPbNeRightRailW') || '224'),
+                        startRailResize(e, which) {
+                            const startX = e.clientX;
+                            const origin = this[which + 'RailW'];
+                            // Left-side rails grow as the cursor moves right;
+                            // right-side rails grow as the cursor moves left.
+                            const sign = (which === 'left' || which === 'neLeft') ? 1 : -1;
+                            const lsKey = {
+                                left:    'psPbLeftRailW',
+                                right:   'psPbRightRailW',
+                                neLeft:  'psPbNeLeftRailW',
+                                neRight: 'psPbNeRightRailW',
+                            }[which];
+                            const move = ev => {
+                                const next = Math.max(120, Math.min(540, origin + sign * (ev.clientX - startX)));
+                                this[which + 'RailW'] = next;
+                                localStorage.setItem(lsKey, String(next));
+                            };
+                            const up = () => {
+                                window.removeEventListener('pointermove', move);
+                                window.removeEventListener('pointerup', up);
+                                document.body.style.userSelect = '';
+                            };
+                            window.addEventListener('pointermove', move);
+                            window.addEventListener('pointerup', up);
+                            document.body.style.userSelect = 'none';
+                            e.preventDefault();
+                        },
                         // Variable picker · opened by right-click on a text field.
                         // Stores the target field + its caret position at click
                         // time so we know exactly where to splice the token.
