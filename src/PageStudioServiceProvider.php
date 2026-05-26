@@ -40,13 +40,17 @@ class PageStudioServiceProvider extends ServiceProvider
         ], 'page-studio-views');
 
         $this->registerPageRoutes();
-        $this->injectModelOptions();
         $this->registerBuiltinNodes();
         $this->registerBuiltinBlocks();
         $this->registerBuiltinTemplates();
         $this->discoverNodeTypes();
         $this->discoverBlockTypes();
         $this->discoverTemplates();
+        // Model finder dropdown promotion MUST run after the discovery
+        // pass · discoverNodeTypes rebuilds every node's library entry
+        // from toLibraryEntry() and would otherwise wipe the
+        // kind=select swap.
+        $this->injectModelOptions();
 
         // Gate on the Livewire container binding · `class_exists` alone returns
         // true for autoloaded classes whose service provider has not booted,
