@@ -594,6 +594,11 @@ class PageBuilder extends Component
      */
     protected function cloneBlockWithFreshIds(array $block): array
     {
+        // Round-trip through JSON to break any structure-sharing between
+        // the source and the clone · Livewire's snapshot dehydrate / hydrate
+        // can leave nested arrays (settings, children) cross-linked, so a
+        // later wire:model write through one would bleed into the other.
+        $block = json_decode(json_encode($block, JSON_UNESCAPED_UNICODE) ?: '{}', true) ?: [];
         $block['id'] = bin2hex(random_bytes(6));
         if (! empty($block['children']) && is_array($block['children'])) {
             foreach ($block['children'] as $slot => $kids) {
@@ -859,7 +864,13 @@ class PageBuilder extends Component
         $this->pushHistory();
         foreach ($this->nodes as $node) {
             if ($node['id'] !== $id) continue;
-            $clone = $node;
+            // Round-trip through JSON to force a deep copy of every nested
+            // array (settings, position, etc.). PHP arrays are copy-on-
+            // write, but Livewire's snapshot dehydration can leave nested
+            // arrays sharing structure between client + server, so a later
+            // wire:model.live write through one node bleeds into the
+            // other. Serialising guarantees fully independent trees.
+            $clone = json_decode(json_encode($node, JSON_UNESCAPED_UNICODE) ?: '{}', true) ?: [];
             $clone['id'] = 'n_'.bin2hex(random_bytes(4));
             $clone['position'] = [
                 'x' => (int) ($node['position']['x'] ?? 0) + 30,

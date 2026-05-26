@@ -568,7 +568,15 @@
                         @php $block = $this->selectedBlock; $prefix = $this->selectedSettingsPrefix(); @endphp
                         <p class="ps-pb-hint">Editing <code>{{ $block['type'] }}</code></p>
                         @foreach ($this->selectedBlockSchema as $key => $def)
-                            <div class="ps-pb-field" data-field-key="{{ $key }}">
+                            {{-- wire:key keyed on the selected block path so
+                                 Livewire force-remounts inputs when the user
+                                 switches between two blocks of the same type
+                                 (e.g. after duplicateBlock). Without it the
+                                 morphed input could keep the previous
+                                 wire:model path and route typed values to
+                                 the wrong block. --}}
+                            <div class="ps-pb-field" data-field-key="{{ $key }}"
+                                 wire:key="block-field-{{ $this->selectedPath }}-{{ $key }}">
                                 <div class="ps-pb-field-head">
                                     <label>{{ $def['label'] ?? $key }}</label>
                                     @if (! empty($this->variables) && in_array($def['kind'], ['text','textarea','url'], true))
@@ -1351,7 +1359,8 @@
 
                 {{-- ─── RIGHT · node settings · only rendered while a node is selected ─── --}}
                 @if ($this->selectedNode)
-                <aside class="ps-ne-settings">
+                <aside class="ps-ne-settings"
+                       wire:key="ne-settings-{{ $this->selectedNodeId }}">
                     <button type="button"
                             class="ps-ne-rail-grabber ps-ne-rail-grabber--left"
                             @pointerdown="startRailResize($event, 'neRight')"
@@ -1365,7 +1374,15 @@
                             <p class="ps-pb-hint">No editable settings.</p>
                         @else
                             @foreach ($schema['settings'] as $key => $def)
-                                <div class="ps-pb-field">
+                                {{-- wire:key includes the selected node id so
+                                     Livewire force-remounts the input element
+                                     when selection switches between two nodes
+                                     of the same type · prevents the previous
+                                     wire:model path from sticking around in
+                                     the morphed DOM and writing to the
+                                     wrong node. --}}
+                                <div class="ps-pb-field"
+                                     wire:key="ne-field-{{ $this->selectedNodeId }}-{{ $key }}">
                                     <label>
                                         {{ $def['label'] ?? $key }}
                                         @if (($def['kind'] ?? 'text') === 'number')
