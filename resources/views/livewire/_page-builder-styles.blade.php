@@ -256,9 +256,14 @@
                 .ps-pb-canvas-wrap--phone  .ps-pb-canvas { max-width: 24.375rem; margin-left: auto; margin-right: auto; box-shadow: 0 0 0 1px var(--line, #3A3D40); }
                 .ps-pb-device-toggle { display: inline-flex; gap: 1px; border: 1px solid var(--line, #3A3D40); border-radius: .35rem; overflow: hidden; }
                 .ps-pb-device-btn {
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .25rem;
                     background: transparent; color: var(--ink-dim, #A3A099);
-                    border: 0; padding: 0 .55rem; height: 1.75rem;
-                    cursor: pointer; font: inherit; font-size: .85rem;
+                    border: 0; padding: .35rem .65rem;
+                    cursor: pointer; font: inherit; font-size: .8rem;
+                    line-height: 1;
+                    white-space: nowrap;
                 }
                 .ps-pb-device-btn.is-active { background: rgba(255,255,255,.05); color: var(--ink, #F0EDE5); }
                 .ps-pb-device-btn:hover { color: var(--ink, #F0EDE5); }
@@ -971,19 +976,26 @@
                 .ps-pb-preview-pane--tablet  { max-width: 48rem;  }    /* ~768 px */
                 .ps-pb-preview-pane--desktop { max-width: 64rem;  }
 
-                /* Device-frame previews override the block-level grid widths.
-                   The columns blocks emit a viewport-width @media query that
-                   doesn't fire when only the canvas-wrap is phone-sized · the
-                   real viewport is still 1440px. Use parent-class selectors
-                   so the 2-up + 3-up grids collapse appropriately regardless
-                   of viewport. !important beats the inline grid-template-
-                   columns the block render emits. */
+                /* Device-frame overrides for both preview pane AND edit
+                   canvas. The columns blocks emit a viewport-width @media
+                   query that doesn't fire when only the canvas-wrap is
+                   phone-sized. Parent-class selectors with !important so
+                   they beat the inline grid-template-columns the block
+                   render emits. Same shape covers the edit-mode layout
+                   frame (block-editor slots) so authors see the collapsed
+                   shape immediately when they pick Phone in the topbar. */
                 .ps-pb-preview-pane--phone .ps-render-cols-2,
-                .ps-pb-preview-pane--phone .ps-render-cols-3 {
+                .ps-pb-preview-pane--phone .ps-render-cols-3,
+                .ps-pb-canvas-wrap--phone  .ps-render-cols-2,
+                .ps-pb-canvas-wrap--phone  .ps-render-cols-3,
+                .ps-pb-canvas-wrap--phone  .ps-pb-layout--slots-2,
+                .ps-pb-canvas-wrap--phone  .ps-pb-layout--slots-3 {
                     grid-template-columns: 1fr !important;
                     gap: 1.5rem !important;
                 }
-                .ps-pb-preview-pane--tablet .ps-render-cols-3 {
+                .ps-pb-preview-pane--tablet .ps-render-cols-3,
+                .ps-pb-canvas-wrap--tablet  .ps-render-cols-3,
+                .ps-pb-canvas-wrap--tablet  .ps-pb-layout--slots-3 {
                     grid-template-columns: 1fr 1fr !important;
                 }
 
