@@ -11,10 +11,16 @@ function pageStudioFakeModelTree(string $base): array
     @mkdir($base, 0755, true);
     @mkdir("$base/Subnamespace", 0755, true);
 
-    file_put_contents("$base/Widget.php", "<?php\nnamespace Acme\\Models;\nclass Widget extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
-    file_put_contents("$base/Sprocket.php", "<?php\nnamespace Acme\\Models;\nclass Sprocket extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    // Two attributed models · should land in the dropdown.
+    file_put_contents("$base/Widget.php",
+        "<?php\nnamespace Acme\\Models;\nuse LoggedCloud\\PageStudio\\Attributes\\ExposeToModelFinder;\n#[ExposeToModelFinder]\nclass Widget extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    file_put_contents("$base/Subnamespace/Nested.php",
+        "<?php\nnamespace Acme\\Models\\Subnamespace;\nuse LoggedCloud\\PageStudio\\Attributes\\ExposeToModelFinder;\n#[ExposeToModelFinder]\nclass Nested extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    // One un-attributed Eloquent model · must NOT appear.
+    file_put_contents("$base/Sprocket.php",
+        "<?php\nnamespace Acme\\Models;\nclass Sprocket extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    // Not even an Eloquent model · must NOT appear.
     file_put_contents("$base/NotAModel.php", "<?php\nnamespace Acme\\Models;\nclass NotAModel { public string \$name = 'plain'; }\n");
-    file_put_contents("$base/Subnamespace/Nested.php", "<?php\nnamespace Acme\\Models\\Subnamespace;\nclass Nested extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
 
     // Eager-require so class_exists() returns true without an autoloader.
     require_once "$base/Widget.php";
@@ -28,7 +34,7 @@ function pageStudioFakeModelTree(string $base): array
     ];
 }
 
-it('scans a models directory and returns FQCN → nice-name', function () {
+it('scans a models directory and returns FQCN → nice-name for #[ExposeToModelFinder]-decorated classes only', function () {
     $base = sys_get_temp_dir().'/page-studio-models-'.uniqid();
     ['dir' => $dir, 'namespace' => $ns] = pageStudioFakeModelTree($base);
 
@@ -36,10 +42,69 @@ it('scans a models directory and returns FQCN → nice-name', function () {
 
     expect($map)->toHaveKey('Acme\\Models\\Widget')
         ->and($map['Acme\\Models\\Widget'])->toBe('Widget')
-        ->and($map)->toHaveKey('Acme\\Models\\Sprocket')
         ->and($map)->toHaveKey('Acme\\Models\\Subnamespace\\Nested')
         ->and($map['Acme\\Models\\Subnamespace\\Nested'])->toBe('Nested')
+        ->and($map)->not->toHaveKey('Acme\\Models\\Sprocket')
         ->and($map)->not->toHaveKey('Acme\\Models\\NotAModel');
+});
+
+it('records the attribute\'s findBy + searchable cols alongside the label · per-model config', function () {
+    // Each decorated class declares its own lookup cols and search
+    // cols. The discovery cache must preserve those so the finder
+    // node UI can surface a per-model finder_key dropdown.
+    $base = sys_get_temp_dir().'/page-studio-models-cfg-'.uniqid();
+    @mkdir($base, 0755, true);
+
+    file_put_contents("$base/Customer.php",
+        "<?php\nnamespace CfgAcme\\Models;\n"
+        ."use LoggedCloud\\PageStudio\\Attributes\\ExposeToModelFinder;\n"
+        ."#[ExposeToModelFinder(label: 'Guest', findBy: ['id', 'email'], searchable: ['name', 'email', 'phone'])]\n"
+        ."class Customer extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    file_put_contents("$base/Booking.php",
+        "<?php\nnamespace CfgAcme\\Models;\n"
+        ."use LoggedCloud\\PageStudio\\Attributes\\ExposeToModelFinder;\n"
+        ."#[ExposeToModelFinder]\n"
+        ."class Booking extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+
+    require_once "$base/Customer.php";
+    require_once "$base/Booking.php";
+
+    $records = ModelDiscovery::records($base, 'CfgAcme\\Models');
+
+    expect($records['CfgAcme\\Models\\Customer']['label'])->toBe('Guest')
+        ->and($records['CfgAcme\\Models\\Customer']['findBy'])->toBe(['id', 'email'])
+        ->and($records['CfgAcme\\Models\\Customer']['searchable'])->toBe(['name', 'email', 'phone'])
+        // Defaults · undecorated args still produce a useable record.
+        ->and($records['CfgAcme\\Models\\Booking']['label'])->toBe('Booking')
+        ->and($records['CfgAcme\\Models\\Booking']['findBy'])->toBe(['id'])
+        ->and($records['CfgAcme\\Models\\Booking']['searchable'])->toBe([]);
+});
+
+it('only includes models decorated with #[ExposeToModelFinder] · opt-in via the attribute', function () {
+    // Mixed tree · some models attributed, some not. The scan must
+    // ignore the un-attributed ones so the host app's internal models
+    // don't leak into authoring UIs.
+    $base = sys_get_temp_dir().'/page-studio-models-attr-'.uniqid();
+    @mkdir($base, 0755, true);
+
+    file_put_contents("$base/Booking.php",
+        "<?php\nnamespace AttrAcme\\Models;\nuse LoggedCloud\\PageStudio\\Attributes\\ExposeToModelFinder;\n#[ExposeToModelFinder]\nclass Booking extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    file_put_contents("$base/SecretInternal.php",
+        "<?php\nnamespace AttrAcme\\Models;\nclass SecretInternal extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+    file_put_contents("$base/Customer.php",
+        "<?php\nnamespace AttrAcme\\Models;\nuse LoggedCloud\\PageStudio\\Attributes\\ExposeToModelFinder;\n#[ExposeToModelFinder(label: 'Guest')]\nclass Customer extends \\Illuminate\\Database\\Eloquent\\Model {}\n");
+
+    require_once "$base/Booking.php";
+    require_once "$base/SecretInternal.php";
+    require_once "$base/Customer.php";
+
+    $map = ModelDiscovery::scan($base, 'AttrAcme\\Models');
+
+    expect($map)->toHaveKey('AttrAcme\\Models\\Booking')
+        ->and($map['AttrAcme\\Models\\Booking'])->toBe('Booking')
+        ->and($map)->toHaveKey('AttrAcme\\Models\\Customer')
+        ->and($map['AttrAcme\\Models\\Customer'])->toBe('Guest')
+        ->and($map)->not->toHaveKey('AttrAcme\\Models\\SecretInternal');
 });
 
 it('returns an empty array when the models dir is missing', function () {
@@ -47,13 +112,18 @@ it('returns an empty array when the models dir is missing', function () {
     expect($map)->toBe([]);
 });
 
-it('writes and re-reads the cache file', function () {
+it('writes and re-reads the cache file · accepts the legacy [fqcn => label] shape too', function () {
+    // Legacy shape · still callable by old host-side tooling. The
+    // writer normalises it into the new record structure so the
+    // runtime always reads the same shape.
     $cache = sys_get_temp_dir().'/page-studio-models-cache-'.uniqid().'.php';
     ModelDiscovery::writeCache(['App\\Models\\User' => 'User'], $cache);
 
     expect(file_exists($cache))->toBeTrue();
     $loaded = require $cache;
-    expect($loaded)->toBe(['App\\Models\\User' => 'User']);
+    expect($loaded)->toBe([
+        'App\\Models\\User' => ['label' => 'User', 'findBy' => ['id'], 'searchable' => []],
+    ]);
 
     @unlink($cache);
 });

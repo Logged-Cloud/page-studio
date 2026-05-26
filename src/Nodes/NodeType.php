@@ -90,6 +90,30 @@ abstract class NodeType
     }
 
     /**
+     * Optional · override one or more SETTINGS fields based on the
+     * current node instance. Counterpart to dynamicOutputs() · used
+     * when the schema for a field is conditional on another field's
+     * value (e.g. the Model finder's `finder_key` becomes a select
+     * populated from the selected model's declared findBy columns).
+     *
+     * Return `null` to leave the static `settings()` shape alone, or
+     * an array keyed by field name with the same shape as `settings()`
+     * — only the listed fields are overridden, all other fields keep
+     * their default schema.
+     *
+     * `PageBuilder::selectedNodeSchema()` merges this into the
+     * library entry on every render, so the moment a dependent
+     * setting flips the panel picks up the new shape.
+     *
+     * @param array<string, mixed> $node
+     * @return array<string, array<string, mixed>>|null
+     */
+    public function dynamicSettings(array $node): ?array
+    {
+        return null;
+    }
+
+    /**
      * Return the config-shape the rest of the studio (palette renderer,
      * canvas, engine fallbacks) reads from `page-studio.nodes`. The
      * `class` key lets the engine round-trip back to the implementation.

@@ -2249,7 +2249,35 @@ class PageBuilder extends Component
         $node = $this->selectedNode();
         if (! $node) return [];
         $library = config('page-studio.nodes', []);
-        return $library[$node['type']] ?? [];
+        $schema  = $library[$node['type']] ?? [];
+
+        // Class-defined nodes can override settings dynamically based on
+        // the current instance · e.g. the Model finder's finder_key
+        // becomes a select sourced from the selected model's findBy. We
+        // merge the override per-field so the rest of the static schema
+        // (other fields, ordering) stays intact.
+        $class = $schema['class'] ?? null;
+        if (is_string($class) && class_exists($class) && ! empty($schema['settings'])) {
+            try {
+                $instance = new $class();
+                $dynamic  = method_exists($instance, 'dynamicSettings')
+                    ? $instance->dynamicSettings($node)
+                    : null;
+                if (is_array($dynamic)) {
+                    foreach ($dynamic as $key => $def) {
+                        if (isset($schema['settings'][$key])) {
+                            $schema['settings'][$key] = array_merge($schema['settings'][$key], $def);
+                        } else {
+                            $schema['settings'][$key] = $def;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                logger()->debug('page-studio: dynamicSettings() threw for '.$class.' · '.$e->getMessage());
+            }
+        }
+
+        return $schema;
     }
 
     public function selectedNodeSettingsPrefix(): string
