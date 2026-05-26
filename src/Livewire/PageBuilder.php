@@ -88,6 +88,19 @@ class PageBuilder extends Component
      */
     public string $selectedPath = '';
 
+    /**
+     * Block IDs this Livewire component currently holds a lock on ·
+     * tab-scoped (a fresh component instance starts empty) so each tab
+     * filters out ITS OWN claims from the "someone else is editing"
+     * ribbon and instead shows a "You editing" indicator. Essential
+     * for anonymous / public-form viewers, where author_id is null on
+     * every row and we can't disambiguate self from another anon by
+     * id alone.
+     *
+     * @var array<int, string>
+     */
+    public array $heldBlockLockIds = [];
+
     public bool $previewMode = false;
 
     /**
@@ -1612,6 +1625,7 @@ class PageBuilder extends Component
                 'author_name' => $authorName,
                 'expires_at'  => now()->addSeconds(30),
             ]);
+            $this->rememberHeldLock($blockId);
             return true;
         }
 
@@ -1624,6 +1638,7 @@ class PageBuilder extends Component
                 'expires_at'  => now()->addSeconds(30),
             ],
         );
+        $this->rememberHeldLock($blockId);
 
         // Record the take in the activity feed · noisy lock churn from
         // refreshes is filtered out by the same-author branch above.
@@ -1646,13 +1661,36 @@ class PageBuilder extends Component
     public function releaseBlockLock(string $blockId): void
     {
         $pageId = $this->resolvePageId();
-        if ($pageId === null) return;
+        if ($pageId === null) {
+            $this->forgetHeldLock($blockId);
+            return;
+        }
         [$authorId] = $this->currentAuthor();
 
         BlockLock::where('page_id', $pageId)
             ->where('block_id', $blockId)
             ->where('author_id', $authorId)
             ->delete();
+        $this->forgetHeldLock($blockId);
+    }
+
+    /** Track that this component claimed $blockId · used by activeBlockLocks
+     *  and myBlockLocks to tell self-locks from foreign ones. */
+    protected function rememberHeldLock(string $blockId): void
+    {
+        if (! in_array($blockId, $this->heldBlockLockIds, true)) {
+            $this->heldBlockLockIds[] = $blockId;
+        }
+    }
+
+    /** Forget a claim · called from release/takeover so a stale id
+     *  doesn't keep suppressing a foreign lock that took the slot. */
+    protected function forgetHeldLock(string $blockId): void
+    {
+        $this->heldBlockLockIds = array_values(array_filter(
+            $this->heldBlockLockIds,
+            fn ($id) => $id !== $blockId,
+        ));
     }
 
     /**
@@ -1746,6 +1784,12 @@ class PageBuilder extends Component
             // Skip the current user's own locks · the UI is meant to
             // warn ABOUT other people, not the holder themselves.
             if ($row->author_id !== null && $row->author_id === $authorId) continue;
+            // Component-scoped self-tracking · for anonymous viewers
+            // (author_id null on both sides) the id-match above can't
+            // help us. heldBlockLockIds is populated when this
+            // Livewire instance claims a block, so we can still tell
+            // self from foreign in single-tab anon scenarios.
+            if (in_array($row->block_id, $this->heldBlockLockIds, true)) continue;
             // Name-fallback · the host app may resolve the SAME human
             // person to a different author_id in different sessions
             // (multi-guard, post-login switch, MBR-style admin/front
@@ -1760,6 +1804,42 @@ class PageBuilder extends Component
                 'name'       => (string) ($row->author_name ?: 'Someone'),
                 'field'      => (string) ($row->field ?? ''),
                 'expires_at' => $row->expires_at?->toIso8601String() ?? '',
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Locks the CURRENT viewer holds on the bound page · keyed by
+     * block id so the editor template can render a positive "You
+     * editing" indicator instead of either silence or the red
+     * "someone else editing" ribbon.
+     *
+     * Sourced from heldBlockLockIds (component-scoped, survives the
+     * Livewire request cycle) intersected with rows that are still
+     * active — a heartbeat that lapsed, or a takeover by another
+     * user, drops the entry on the next read.
+     *
+     * @return array<string, array{name: string, field: string}>
+     */
+    #[Computed]
+    public function myBlockLocks(): array
+    {
+        $pageId = $this->resolvePageId();
+        if ($pageId === null || empty($this->heldBlockLockIds)) return [];
+
+        [, $authorName] = $this->currentAuthor();
+
+        $rows = BlockLock::where('page_id', $pageId)
+            ->whereIn('block_id', $this->heldBlockLockIds)
+            ->active()
+            ->get();
+
+        $out = [];
+        foreach ($rows as $row) {
+            $out[$row->block_id] = [
+                'name'  => $authorName,
+                'field' => (string) ($row->field ?? ''),
             ];
         }
         return $out;
@@ -1793,6 +1873,7 @@ class PageBuilder extends Component
             'author_name' => $authorName,
             'expires_at'  => now()->addSeconds(30),
         ]);
+        $this->rememberHeldLock($blockId);
 
         Activity::create([
             'page_id'     => $pageId,

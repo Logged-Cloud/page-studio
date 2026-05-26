@@ -10,12 +10,16 @@
 @php $schema = config('page-studio.blocks.'.$block['type'], []); @endphp
 @php $slotJson = $slot === null ? 'null' : "'".$slot."'"; @endphp
 @php
-    // Collaboration · is another author currently editing this block?
-    // activeBlockLocks is keyed by block id and only contains OTHER users'
-    // claims, so a hit here means we should render the read-only ribbon.
+    // Collaboration · two ribbon paths:
+    //  - activeBlockLocks  · OTHER users editing · red ribbon, gray out
+    //  - myBlockLocks      · THIS viewer editing · green "You editing"
+    //                        confirmation, no gray-out, no take-over button
     $locks      = $this->activeBlockLocks;
-    $lockedBy   = $locks[$block['id']]['name']  ?? null;
-    $lockField  = $locks[$block['id']]['field'] ?? '';
+    $myLocks    = $this->myBlockLocks;
+    $lockedBy   = $locks[$block['id']]['name']    ?? null;
+    $lockField  = $locks[$block['id']]['field']   ?? '';
+    $isMyLock   = isset($myLocks[$block['id']]);
+    $myField    = $myLocks[$block['id']]['field'] ?? '';
 @endphp
 
 <div
@@ -46,12 +50,12 @@
     @pointerdown="startTouchDrag($event, 'block', @js($path), @js($block['type']))"
 >
     @if ($lockedBy)
-        {{-- Lock ribbon · informational by default but exposes a
-             "Take over" button so a viewer who knows the lock is stale
-             (own ghost session, departed colleague, etc.) can break it
-             without waiting for the 30s TTL. The button is the only
-             pointer-active element; the rest of the ribbon stays
-             pass-through. --}}
+        {{-- Foreign lock ribbon · informational by default but exposes
+             a "Take over" button so a viewer who knows the lock is
+             stale (own ghost session, departed colleague, etc.) can
+             break it without waiting for the 30s TTL. The button is
+             the only pointer-active element; the rest of the ribbon
+             stays pass-through. --}}
         <div class="ps-pb-lock-ribbon" style="pointer-events:none">
             <span>🔒 {{ $lockedBy }} editing
                 @if ($lockField !== '')
@@ -65,6 +69,17 @@
                     title="Break the lock and claim this block for yourself">
                 Take over
             </button>
+        </div>
+    @elseif ($isMyLock)
+        {{-- Self ribbon · positive confirmation that this viewer holds
+             the lock. Subtle green pill, no gray-out, no pointer
+             capture · purely informational. --}}
+        <div class="ps-pb-lock-ribbon ps-pb-lock-ribbon--self" style="pointer-events:none">
+            <span>✎ You editing
+                @if ($myField !== '')
+                    · <em style="font-style:normal;opacity:.85">{{ $myField }}</em>
+                @endif
+            </span>
         </div>
     @endif
 
