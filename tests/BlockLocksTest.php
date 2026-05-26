@@ -145,6 +145,55 @@ it('activeBlockLocks computed returns locks held only by other users', function 
         ->and($locks)->not->toHaveKey('blk-2');
 });
 
+it('activeBlockLocks suppresses a lock whose holder shares the viewer\'s name · models "another session of mine"', function () {
+    // Alice signs in once and claims a block · simulates an earlier
+    // browser tab / pre-relogin session.
+    $page = blPage();
+    blAuthAs(1, 'Alice');
+    $pb1 = new PageBuilder();
+    $pb1->mount(pageId: $page->id);
+    $pb1->acquireBlockLock('blk-1');
+
+    // Same human signs in again from a different device · host app
+    // gives them a different id (multi-guard, fresh login, etc.) but
+    // the display name is still "Alice". The old lock must NOT show
+    // up as "someone else" or we lock Alice out of her own work.
+    blAuthAs(99, 'Alice');
+    $pb2 = new PageBuilder();
+    $pb2->mount(pageId: $page->id);
+
+    expect($pb2->activeBlockLocks())->not->toHaveKey('blk-1');
+});
+
+it('takeOverBlockLock replaces the existing row and lets the new viewer claim the block', function () {
+    $page = blPage();
+
+    // Alice locks blk-1 then walks away · the row keeps a future expiry
+    // (perhaps because a stale tab is still heartbeating it).
+    blAuthAs(1, 'Alice');
+    $pbA = new PageBuilder();
+    $pbA->mount(pageId: $page->id);
+    $pbA->acquireBlockLock('blk-1');
+
+    // Bob comes along, sees the ribbon, and clicks "Take over".
+    blAuthAs(2, 'Bob');
+    $pbB = new PageBuilder();
+    $pbB->mount(pageId: $page->id);
+
+    expect($pbB->acquireBlockLock('blk-1'))->toBeFalse();   // baseline · Alice still holds it
+    expect($pbB->takeOverBlockLock('blk-1'))->toBeTrue();
+
+    $row = BlockLock::where('page_id', $page->id)->where('block_id', 'blk-1')->first();
+    expect($row)->not->toBeNull()
+        ->and($row->author_id)->toBe(2)
+        ->and($row->author_name)->toBe('Bob')
+        ->and($row->expires_at->isFuture())->toBeTrue();
+
+    // The take-over is recorded in the activity feed so an admin can
+    // tell apart "legitimate edit" from "lock stolen from someone".
+    expect(\LoggedCloud\PageStudio\Models\Activity::where('verb', 'lock_taken_over')->count())->toBe(1);
+});
+
 it('ephemeral mode (no pageId) silently no-ops on every lock method', function () {
     blAuthAs(1, 'Alice');
 
