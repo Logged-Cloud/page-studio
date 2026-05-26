@@ -124,13 +124,15 @@
 
                 .ps-pb-grid {
                     display: grid;
-                    grid-template-columns: var(--rail-w) 1fr var(--rail-w);
+                    /* Per-rail widths come from Alpine via the :style binding ·
+                       --rail-l / --rail-r fall back to the historical fixed
+                       width if Alpine hasn't booted yet. */
+                    grid-template-columns: var(--rail-l, var(--rail-w)) 1fr var(--rail-r, var(--rail-w));
                     grid-template-areas: "left canvas right";
                     gap: 0;
                     flex: 1;
                     min-height: 0;
                     overflow: hidden;
-                    transition: grid-template-columns .15s ease;
                     /* Reserve viewport room for the fixed Variables Modifier
                        drawer + the variables strip floating just above it.
                        Without this the bottom of the left rail (block
@@ -139,8 +141,8 @@
                     padding-bottom: calc(var(--ps-pb-drawer-h, 0px) + 3.25rem);
                     box-sizing: border-box;
                 }
-                .ps-pb-grid.is-left-collapsed  { grid-template-columns: 0 1fr var(--rail-w); }
-                .ps-pb-grid.is-right-collapsed { grid-template-columns: var(--rail-w) 1fr 0; }
+                .ps-pb-grid.is-left-collapsed  { grid-template-columns: 0 1fr var(--rail-r, var(--rail-w)); }
+                .ps-pb-grid.is-right-collapsed { grid-template-columns: var(--rail-l, var(--rail-w)) 1fr 0; }
                 .ps-pb-grid.is-left-collapsed.is-right-collapsed { grid-template-columns: 0 1fr 0; }
 
                 /* ─── Mobile · stack to a single column, rails turn into
@@ -1018,6 +1020,31 @@
                     flex: 1;
                 }
 
+                /* ─── Rail resize grabbers ────────────────────────────────
+                   A 5px-wide strip on the inner edge of each rail. Cursor
+                   tweens to col-resize, drag updates the matching Alpine
+                   width state via startRailResize(). Positioned absolute
+                   inside the rail so the rail's normal padding doesn't
+                   shift it; pointer-events stay live across the full
+                   strip. */
+                .ps-pb-rail, .ps-ne-palette, .ps-ne-settings { position: relative; }
+                .ps-pb-rail-grabber, .ps-ne-rail-grabber {
+                    position: absolute;
+                    top: 0; bottom: 0;
+                    width: 6px;
+                    background: transparent;
+                    border: 0;
+                    cursor: col-resize;
+                    z-index: 30;
+                    padding: 0;
+                }
+                .ps-pb-rail-grabber:hover, .ps-pb-rail-grabber:active,
+                .ps-ne-rail-grabber:hover, .ps-ne-rail-grabber:active {
+                    background: color-mix(in srgb, var(--accent, #2C66E8) 50%, transparent);
+                }
+                .ps-pb-rail-grabber--right, .ps-ne-rail-grabber--right { right: -3px; }
+                .ps-pb-rail-grabber--left,  .ps-ne-rail-grabber--left  { left:  -3px; }
+
                 /* ─── Variables strip ─────────────────────────────────────
                    Persistent horizontal marquee of variable chips sitting
                    just above the Variables Modifier drawer. The strip is
@@ -1189,16 +1216,16 @@
 
                 .ps-ne-grid {
                     display: grid;
-                    grid-template-columns: 10rem 1fr 14rem;
+                    /* Per-rail widths from Alpine. Fall back to the historical
+                       fixed widths if Alpine hasn't booted yet. */
+                    grid-template-columns: var(--ne-rail-l, 10rem) 1fr var(--ne-rail-r, 14rem);
                     flex: 1;
                     min-height: 0;
                 }
                 /* When the palette is collapsed via the toggle, drop its
-                   column so the canvas reclaims the freed width · without
-                   this the centre track stays at 1fr alongside an empty
-                   10rem cell, making the canvas look squeezed to the left. */
+                   column so the canvas reclaims the freed width. */
                 .ps-ne-grid--palette-closed {
-                    grid-template-columns: 1fr 14rem;
+                    grid-template-columns: 1fr var(--ne-rail-r, 14rem);
                 }
                 .ps-ne-grid--palette-closed:not(:has(.ps-ne-settings)) {
                     grid-template-columns: 1fr;
@@ -1207,7 +1234,7 @@
                 /* When the settings aside is removed (no node selected) the
                    centre canvas reclaims the freed column. */
                 .ps-ne-grid:not(:has(.ps-ne-settings)) {
-                    grid-template-columns: 10rem 1fr;
+                    grid-template-columns: var(--ne-rail-l, 10rem) 1fr;
                 }
                 .ps-ne-palette {
                     overflow-y: auto;
