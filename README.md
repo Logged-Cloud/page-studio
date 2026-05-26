@@ -18,7 +18,7 @@ Designed to drop into any Livewire 3+ Laravel app.
 All four features ship out of the box on v2.2+ · short-poll based (~8s heartbeat), pluggable for a Reverb / Pusher swap later.
 
 > **Extending the studio?** Step-by-step tutorials live under `docs/tutorials/`:
-> [Custom block](docs/tutorials/custom-blocks.md) · [Custom node](docs/tutorials/custom-nodes.md) · [Custom node with dynamic outputs](docs/tutorials/dynamic-outputs.md) · [Custom template](docs/tutorials/custom-templates.md) · [Theming + light mode](docs/tutorials/theming.md) · [Migrate HTML content](docs/tutorials/migrate-html.md) · [Deploying to prod](docs/tutorials/deploying-to-prod.md) · [Auth-gated authoring](docs/tutorials/auth-gated-authoring.md) · [i18n strategies](docs/tutorials/i18n-strategies.md)
+> [Custom block](docs/tutorials/custom-blocks.md) · [Custom node](docs/tutorials/custom-nodes.md) · [Custom node with dynamic outputs](docs/tutorials/dynamic-outputs.md) · [Custom template](docs/tutorials/custom-templates.md) · [Theming + light mode](docs/tutorials/theming.md) · [Migrate HTML content](docs/tutorials/migrate-html.md) · [Deploying to prod](docs/tutorials/deploying-to-prod.md) · [Auth-gated authoring](docs/tutorials/auth-gated-authoring.md) · [Author name mapping](docs/tutorials/author-name-mapping.md) · [i18n strategies](docs/tutorials/i18n-strategies.md)
 
 ---
 
@@ -43,6 +43,7 @@ All four features ship out of the box on v2.2+ · short-poll based (~8s heartbea
   - [Migrate HTML content into the block tree](docs/tutorials/migrate-html.md)
   - [Deploying to production](docs/tutorials/deploying-to-prod.md) · view-cache, render-cache, queue, migration safety
   - [Auth-gated authoring](docs/tutorials/auth-gated-authoring.md) · route + Livewire-component gating, role policies
+  - [Author name mapping](docs/tutorials/author-name-mapping.md) · presence chips + lock ribbons + activity feed when your User model uses a non-standard name field
   - [i18n strategies](docs/tutorials/i18n-strategies.md) · page-per-locale / shared-layout / hybrid
 - [Starter templates](#starter-templates)
 - [Importing existing HTML](#importing-existing-html)
