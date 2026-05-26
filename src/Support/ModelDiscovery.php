@@ -132,6 +132,7 @@ class ModelDiscovery
                 'label'      => $attr->label ?? class_basename($class),
                 'findBy'     => array_values($attr->findBy),
                 'searchable' => array_values($attr->searchable),
+                'expose'     => array_values($attr->expose),
             ];
         }
         ksort($found);
@@ -149,7 +150,12 @@ class ModelDiscovery
     {
         $records = [];
         foreach ($map as $fqcn => $label) {
-            $records[$fqcn] = ['label' => (string) $label, 'findBy' => ['id'], 'searchable' => []];
+            $records[$fqcn] = [
+                'label'      => (string) $label,
+                'findBy'     => ['id'],
+                'searchable' => [],
+                'expose'     => [],
+            ];
         }
         self::writeRecordCache($records, $path);
     }

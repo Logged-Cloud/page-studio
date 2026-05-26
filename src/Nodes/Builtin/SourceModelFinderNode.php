@@ -26,17 +26,54 @@ class SourceModelFinderNode extends NodeType
     public function dynamicOutputs(array $node): ?array
     {
         if (empty($node['settings']['expose_fields'])) return null;
+        $class = (string) ($node['settings']['model_class'] ?? '');
 
-        $fields = \LoggedCloud\PageStudio\Support\ModelFields::for(
-            (string) ($node['settings']['model_class'] ?? ''),
-        );
+        $fields = \LoggedCloud\PageStudio\Support\ModelFields::for($class);
         if (empty($fields)) return null;
+
+        $allowed = $this->allowedExposeCols($class, array_keys($fields));
 
         $outputs = [];
         foreach ($fields as $col => $type) {
+            if (! in_array($col, $allowed, true)) continue;
             $outputs[$col] = ['label' => $col, 'type' => $type];
         }
-        return $outputs;
+        return $outputs ?: null;
+    }
+
+    /**
+     * Filter the column list down to what the model has opted into
+     * exposing as sockets. Two layers:
+     *
+     *  1. #[ExposeToModelFinder(expose: [...])] · explicit allowlist
+     *     · the host author has chosen exactly which cols are safe.
+     *  2. Fallback · respect Laravel's `$hidden` so sensitive cols
+     *     (`password`, `remember_token`) stay out by default.
+     *
+     * @param array<int, string> $available
+     * @return array<int, string>
+     */
+    protected function allowedExposeCols(string $class, array $available): array
+    {
+        $rec = \LoggedCloud\PageStudio\Support\ModelDiscovery::record($class);
+        $explicit = $rec['expose'] ?? [];
+        if (! empty($explicit)) {
+            return array_values(array_intersect($available, $explicit));
+        }
+
+        // No explicit allowlist · drop the host model's $hidden cols.
+        if ($class !== '' && class_exists($class) && is_subclass_of($class, \Illuminate\Database\Eloquent\Model::class)) {
+            try {
+                /** @var \Illuminate\Database\Eloquent\Model $instance */
+                $instance = new $class();
+                $hidden   = $instance->getHidden();
+                return array_values(array_diff($available, $hidden));
+            } catch (\Throwable) {
+                // Boot-time failures (no DB, unexpected ctor) · fall
+                // through to "everything" rather than crash the canvas.
+            }
+        }
+        return $available;
     }
 
     /**
@@ -83,8 +120,14 @@ class SourceModelFinderNode extends NodeType
             if (! $expose) return ['model' => $model];
             if (! $model) return [];
 
+            // Same allowlist the socket list honours · keeps the
+            // runtime output and the design-time outputs in sync, so
+            // a hidden col can't leak even via a manually-wired edge.
+            $available = array_keys($model->attributesToArray());
+            $allowed   = $this->allowedExposeCols($class, $available);
             $out = [];
             foreach ($model->attributesToArray() as $col => $v) {
+                if (! in_array($col, $allowed, true)) continue;
                 $out[$col] = $v instanceof \DateTimeInterface ? $v->format(DATE_ATOM) : $v;
             }
             return $out;
