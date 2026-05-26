@@ -971,6 +971,22 @@
                 .ps-pb-preview-pane--tablet  { max-width: 48rem;  }    /* ~768 px */
                 .ps-pb-preview-pane--desktop { max-width: 64rem;  }
 
+                /* Device-frame previews override the block-level grid widths.
+                   The columns blocks emit a viewport-width @media query that
+                   doesn't fire when only the canvas-wrap is phone-sized · the
+                   real viewport is still 1440px. Use parent-class selectors
+                   so the 2-up + 3-up grids collapse appropriately regardless
+                   of viewport. !important beats the inline grid-template-
+                   columns the block render emits. */
+                .ps-pb-preview-pane--phone .ps-render-cols-2,
+                .ps-pb-preview-pane--phone .ps-render-cols-3 {
+                    grid-template-columns: 1fr !important;
+                    gap: 1.5rem !important;
+                }
+                .ps-pb-preview-pane--tablet .ps-render-cols-3 {
+                    grid-template-columns: 1fr 1fr !important;
+                }
+
                 /* Image upload preview · inside the settings panel */
                 .ps-pb-upload-preview {
                     display: flex; align-items: center; gap: .5rem;
