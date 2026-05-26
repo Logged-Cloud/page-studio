@@ -223,6 +223,13 @@
                         // can sanity-check the responsive shape without
                         // resizing the browser window itself.
                         device: localStorage.getItem('psPbDevice') || 'desktop',
+                        // Node-editor palette is collapsible too · mirrors the
+                        // page-builder rails. Defaults closed on phone so the
+                        // canvas owns the screen; defaults open on desktop +
+                        // tablet for the wider authoring surface.
+                        nodePaletteCollapsed: (typeof window !== 'undefined' && window.innerWidth <= 768)
+                            ? true
+                            : localStorage.getItem('psPbNodePaletteCollapsed') === '1',
                         // Variable picker · opened by right-click on a text field.
                         // Stores the target field + its caret position at click
                         // time so we know exactly where to splice the token.
@@ -331,6 +338,15 @@
                         closeRailOnMobile() {
                             if (typeof window !== 'undefined' && window.innerWidth <= 768) {
                                 this.leftCollapsed = true;
+                            }
+                        },
+
+                        // Same shape as closeRailOnMobile but for the node
+                        // editor palette. Lets the node canvas own the
+                        // viewport after a palette tap on phone.
+                        closeNodePaletteOnMobile() {
+                            if (typeof window !== 'undefined' && window.innerWidth <= 768) {
+                                this.nodePaletteCollapsed = true;
                             }
                         },
 

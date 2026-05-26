@@ -209,17 +209,22 @@
                     .ps-ne-drawer { height: 80vh !important; }
                     .ps-ne-grabber { display: none; }
                     .ps-ne-grid    { grid-template-columns: 1fr; grid-template-areas: "canvas"; }
-                    .ps-ne-palette,
-                    .ps-ne-settings {
+                    /* Node-editor palette + settings on phone · fixed sheets
+                       slid in from the edges. Visibility is now driven by
+                       x-show on the elements themselves (nodePaletteCollapsed +
+                       selectedNode), so the panels are display:none when
+                       closed · no translateX off-screen sleight of hand. */
+                    .ps-ne-grid .ps-ne-palette,
+                    .ps-ne-grid .ps-ne-settings {
                         position: fixed;
                         top: 20vh; bottom: 0;
                         width: min(85vw, 22rem);
                         z-index: 401;
                         background: var(--surface-2, #1E1F22);
-                        transform: translateX(-100%);
-                        transition: transform .2s ease;
+                        box-shadow: 0 8px 32px rgba(0,0,0,.45);
                     }
-                    .ps-ne-settings { right: 0; left: auto; transform: translateX(100%); }
+                    .ps-ne-grid .ps-ne-palette  { left: 0; }
+                    .ps-ne-grid .ps-ne-settings { right: 0; left: auto; }
                     /* Finder overlay · fill the upper half of the viewport on phones. */
                     .ps-pb-find { width: 96vw; top: 6vh; }
                     .ps-pb-find-row { grid-template-columns: 3rem 1.25rem 1fr; }
