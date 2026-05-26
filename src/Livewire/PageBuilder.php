@@ -717,6 +717,41 @@ class PageBuilder extends Component
      * the selectedPath into (parentPath, slot, index) so the Alpine
      * handler doesn't need to.
      */
+    /**
+     * Insert a {{ var }} substitution token into a block's text-bearing
+     * setting at the given character offset. Drives the var-strip
+     * drag-and-drop-onto-block flow · the front-end uses
+     * caretPositionFromPoint to compute the offset, then calls this with
+     * (path, varName, fieldKey, offset).
+     *
+     * fieldKey defaults to the most common text-bearing field for the
+     * block's type when the caller doesn't supply one. Unknown block
+     * types are silently no-op'd.
+     */
+    public function insertVarIntoBlock(string $path, string $varName, ?string $fieldKey = null, int $offset = -1): void
+    {
+        if ($path === '' || $varName === '') return;
+        $block = BlockTree::get($this->blocks, $path);
+        if (! $block) return;
+
+        $fieldKey ??= match ($block['type'] ?? '') {
+            'heading', 'paragraph', 'quote', 'code'   => 'text',
+            'button'                                  => 'label',
+            'hero'                                    => 'heading',
+            default                                   => 'text',
+        };
+
+        $current = (string) ($block['settings'][$fieldKey] ?? '');
+        $token   = '{{ '.$varName.' }}';
+        $len     = mb_strlen($current);
+        $at      = $offset < 0 ? $len : max(0, min($len, $offset));
+
+        $this->pushHistory();
+        $next = mb_substr($current, 0, $at).$token.mb_substr($current, $at);
+        $block['settings'][$fieldKey] = $next;
+        $this->blocks = BlockTree::set($this->blocks, $path, $block);
+    }
+
     public function moveSelectedBlock(int $delta): void
     {
         if ($this->selectedPath === '' || ($delta !== -1 && $delta !== 1)) return;
