@@ -16,7 +16,7 @@ class SourceAuthUserNode extends NodeType
     public static function settings(): array
     {
         return [
-            'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => false, 'help' => 'Show one socket per column instead of a single user output.'],
+            'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => true, 'help' => 'One socket per column · turn off to expose a single user output instead.'],
         ];
     }
 

@@ -136,7 +136,7 @@ return [
             'inputs'   => [],
             'outputs'  => ['user' => ['label' => 'User', 'type' => 'model']],
             'settings' => [
-                'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => false, 'help' => 'Show one socket per column instead of a single user output.'],
+                'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => true, 'help' => 'One socket per column · turn off to expose a single user output instead.'],
             ],
         ],
         'source.auth_id' => [
@@ -186,7 +186,7 @@ return [
             'settings' => [
                 'model_class'   => ['kind' => 'text', 'label' => 'Model FQCN', 'default' => 'App\Models\User'],
                 'finder_key'    => ['kind' => 'text', 'label' => 'Find by column', 'default' => 'id'],
-                'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => false, 'help' => 'Show one socket per column instead of a single model output.'],
+                'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => true, 'help' => 'One socket per column · turn off to expose a single model output instead.'],
             ],
         ],
 

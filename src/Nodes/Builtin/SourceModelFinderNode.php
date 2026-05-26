@@ -19,7 +19,7 @@ class SourceModelFinderNode extends NodeType
         return [
             'model_class'   => ['kind' => 'text', 'label' => 'Model FQCN', 'default' => 'App\Models\User'],
             'finder_key'    => ['kind' => 'text', 'label' => 'Find by column', 'default' => 'id'],
-            'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => false, 'help' => 'Show one socket per column instead of a single model output.'],
+            'expose_fields' => ['kind' => 'bool', 'label' => 'Expose fields as outputs', 'default' => true, 'help' => 'One socket per column · turn off to expose a single model output instead.'],
         ];
     }
 

@@ -75,6 +75,25 @@ it('PageBuilder::selectedNodeSchema merges the node\'s dynamicSettings into the 
     @unlink($cache);
 });
 
+it('Source\\ModelFinderNode::settings ships expose_fields default = true · new nodes get per-column sockets out of the box', function () {
+    $settings = \LoggedCloud\PageStudio\Nodes\Builtin\SourceModelFinderNode::settings();
+
+    expect($settings)->toHaveKey('expose_fields')
+        ->and($settings['expose_fields']['default'])->toBeTrue();
+});
+
+it('config(\'page-studio.nodes\') ships expose_fields default = true on every node that exposes the toggle', function () {
+    $library = config('page-studio.nodes', []);
+
+    foreach ($library as $key => $entry) {
+        $expose = $entry['settings']['expose_fields'] ?? null;
+        if ($expose === null) continue;
+        expect($expose['default'])->toBeTrue(
+            "$key.expose_fields.default must be true · model-finder and auth-user both ship the toggle and both default on",
+        );
+    }
+});
+
 it('dynamicOutputs filters socket list to the model\'s declared expose allowlist · password / remember_token never leak', function () {
     // Cache the per-model record with an explicit allowlist that
     // omits the sensitive cols.
