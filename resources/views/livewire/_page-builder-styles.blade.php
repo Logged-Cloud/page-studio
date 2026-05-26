@@ -132,10 +132,11 @@
                     overflow: hidden;
                     transition: grid-template-columns .15s ease;
                     /* Reserve viewport room for the fixed Variables Modifier
-                       drawer when it's open · without this the bottom of the
-                       left rail (block palette) and the canvas slide UNDER
-                       the drawer rather than alongside it. */
-                    padding-bottom: var(--ps-pb-drawer-h, 0);
+                       drawer + the variables strip floating just above it.
+                       Without this the bottom of the left rail (block
+                       palette) and the canvas slide UNDER the strip and
+                       drawer rather than alongside them. */
+                    padding-bottom: calc(var(--ps-pb-drawer-h, 0px) + 3.25rem);
                     box-sizing: border-box;
                 }
                 .ps-pb-grid.is-left-collapsed  { grid-template-columns: 0 1fr var(--rail-w); }
@@ -1016,6 +1017,71 @@
                     white-space: nowrap;
                     flex: 1;
                 }
+
+                /* ─── Variables strip ─────────────────────────────────────
+                   Persistent horizontal marquee of variable chips sitting
+                   just above the Variables Modifier drawer. The strip is
+                   position:fixed across the bottom of the viewport, riding
+                   up when the drawer opens (its bottom tracks the drawer's
+                   top via --ps-pb-drawer-h). overflow-x:auto + flex-shrink:0
+                   on the chips means a long variable list scrolls
+                   horizontally without wrapping. */
+                .ps-pb-var-strip {
+                    position: fixed;
+                    left: 0; right: 0;
+                    bottom: calc(var(--ps-pb-drawer-h, 0) + 8px);
+                    z-index: 55;
+                    display: flex;
+                    align-items: center;
+                    gap: .55rem;
+                    padding: .35rem .65rem;
+                    background: color-mix(in srgb, var(--surface-2, #1E1F22) 92%, transparent);
+                    border-top: 1px solid var(--line, #3A3D40);
+                    backdrop-filter: blur(8px);
+                    overflow-x: auto;
+                    overflow-y: hidden;
+                    scrollbar-width: thin;
+                }
+                .ps-pb-var-strip-label {
+                    flex-shrink: 0;
+                    font-size: .65rem;
+                    letter-spacing: .08em;
+                    text-transform: uppercase;
+                    color: var(--ink-dim, #A3A099);
+                    padding-right: .35rem;
+                    border-right: 1px solid var(--line, #3A3D40);
+                }
+                .ps-pb-var-strip-track {
+                    display: flex;
+                    align-items: center;
+                    gap: .35rem;
+                    flex: 1;
+                    min-width: 0;
+                }
+                .ps-pb-var-chip {
+                    flex-shrink: 0;
+                    background: var(--surface, #16171a);
+                    color: var(--ink, #F0EDE5);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: 999px;
+                    padding: .25rem .65rem;
+                    font: inherit;
+                    font-size: .75rem;
+                    cursor: grab;
+                    display: inline-flex;
+                    align-items: center;
+                    gap: .25rem;
+                    white-space: nowrap;
+                    transition: border-color .15s, background-color .15s;
+                }
+                .ps-pb-var-chip:hover {
+                    border-color: color-mix(in srgb, var(--accent, #2C66E8) 60%, var(--line, #3A3D40));
+                    background: color-mix(in srgb, var(--accent, #2C66E8) 12%, var(--surface, #16171a));
+                }
+                .ps-pb-var-chip:active { cursor: grabbing; }
+                .ps-pb-var-chip-tok { color: var(--ink-dim, #A3A099); font-family: ui-monospace, monospace; }
+                .ps-pb-var-chip-name { font-weight: 600; }
+                .ps-pb-var-chip-preview { color: var(--ink-dim, #A3A099); font-style: italic; }
 
                 /* ─── Node-editor drawer ──────────────────────────────────
                    Fixed-position so a long canvas never pushes the drawer
