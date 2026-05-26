@@ -818,6 +818,43 @@
         </div>
     @endif
 
+    {{-- ─── Variables strip ───────────────────────────────────────────────────
+         A horizontal scrollable marquee of variable chips that sits just
+         above the Variables Modifier drawer. Always addressable regardless
+         of canvas scroll. Each chip is a draggable {{ name }} token · drop
+         it into any text input to insert the variable substitution. --}}
+    @if (! $previewMode && ! empty($this->variables))
+        <div class="ps-pb-var-strip"
+             role="toolbar"
+             aria-label="Page variables"
+             :style="`bottom: calc(var(--ps-pb-drawer-h, 0) + ${$wire.drawerOpen ? 0 : 8}px)`">
+            <span class="ps-pb-var-strip-label">Variables</span>
+            <div class="ps-pb-var-strip-track">
+                @foreach ($this->variables as $v)
+                    @php $token = '{{ '.$v['name'].' }}'; @endphp
+                    <button type="button"
+                            class="ps-pb-var-chip"
+                            data-var-name="{{ $v['name'] }}"
+                            draggable="true"
+                            @dragstart.stop="
+                                $event.dataTransfer.setData('text/plain', @js($token));
+                                $event.dataTransfer.setData('application/x-page-studio-var', @js($v['name']));
+                                $event.dataTransfer.effectAllowed = 'copy';
+                            "
+                            @click="navigator.clipboard?.writeText(@js($token)); showToast('Copied ' + @js($token) + ' to clipboard', true)"
+                            :title="@js('Drag into a text field or click to copy '.$token)">
+                        <span class="ps-pb-var-chip-tok">&#123;&#123;</span>
+                        <span class="ps-pb-var-chip-name">{{ $v['name'] }}</span>
+                        <span class="ps-pb-var-chip-tok">&#125;&#125;</span>
+                        @if (! empty($v['preview']))
+                            <span class="ps-pb-var-chip-preview">·&nbsp;{{ \Illuminate\Support\Str::limit((string) $v['preview'], 18) }}</span>
+                        @endif
+                    </button>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- ─── Bottom drawer · node variable editor ───────────────────────────── --}}
     {{-- Tuck handle · always-visible bottom-pill that opens / closes the
          node drawer. Mirrors the logged-cloud/navigation chrome's tuck
