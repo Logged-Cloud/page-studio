@@ -128,6 +128,44 @@ it('writes and re-reads the cache file · accepts the legacy [fqcn => label] sha
     @unlink($cache);
 });
 
+it('the Model finder kind=select promotion survives the full provider boot order · regression for "still text input after release"', function () {
+    // The bug · injectModelOptions ran BEFORE discoverNodeTypes, and
+    // the latter rewrote every node's library entry from
+    // toLibraryEntry() — wiping the kind=select promotion. The
+    // user-facing symptom: dropdown never appears even with the
+    // discovery cache populated.
+    $cachePath = ModelDiscovery::cachePath();
+    @mkdir(dirname($cachePath), 0755, true);
+    ModelDiscovery::writeRecordCache([
+        'App\\Models\\User' => ['label' => 'User', 'findBy' => ['id'], 'searchable' => []],
+    ], $cachePath);
+
+    // Re-run the FULL provider boot sequence in the same order the
+    // provider does it · the previous order ran injectModelOptions
+    // BEFORE discoverNodeTypes, and discoverNodeTypes rewrote every
+    // node's library entry from toLibraryEntry(), wiping the
+    // kind=select promotion. The fix moves injectModelOptions to
+    // last so it has the final say.
+    $provider = new \LoggedCloud\PageStudio\PageStudioServiceProvider(app());
+    foreach (['registerBuiltinNodes', 'discoverNodeTypes', 'injectModelOptions'] as $m) {
+        $ref = new ReflectionMethod($provider, $m);
+        $ref->setAccessible(true);
+        $ref->invoke($provider);
+    }
+
+    $library = config('page-studio.nodes', []);
+    $entry   = $library['source.model_finder'] ?? [];
+
+    expect($entry['settings']['model_class']['kind'] ?? null)->toBe('select',
+        'After the full boot order, model_class must still be kind=select · the dropdown is what the user sees');
+    expect($entry['settings']['model_class']['options'] ?? null)->toBe(
+        ['App\\Models\\User' => 'User'],
+        'options must carry the discovered map',
+    );
+
+    @unlink($cachePath);
+});
+
 it('promotes the Model finder setting to a select when models are discovered', function () {
     // Pre-load a cache the service provider will read on boot.
     $cachePath = ModelDiscovery::cachePath();
