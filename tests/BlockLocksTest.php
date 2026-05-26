@@ -231,6 +231,44 @@ it('activeBlockLocks suppresses a lock whose holder shares the viewer\'s name ·
     expect($pb2->activeBlockLocks())->not->toHaveKey('blk-1');
 });
 
+it('an anonymous viewer takeover clears the foreign ribbon · the row stops showing in activeBlockLocks', function () {
+    // Reproduces "I clicked Take over but the ribbon stays" · without
+    // heldBlockLockIds tracking, an anonymous viewer's new claim
+    // (author_id=null) can never be filtered out by the id-match
+    // branch (null !== null is false). The component-scoped tracking
+    // is the only thing standing between us and a permanently stuck
+    // ribbon.
+    $page = blPage();
+
+    // Step 1 · some prior anonymous holder leaves a lock behind.
+    blAuthAs(1, 'Alice');
+    $stale = BlockLock::create([
+        'page_id'     => $page->id,
+        'block_id'    => 'blk-stuck',
+        'author_id'   => null,
+        'author_name' => 'Anonymous',
+        'expires_at'  => now()->addSeconds(30),
+    ]);
+    expect($stale->author_id)->toBeNull();
+
+    // Step 2 · the new viewer is anonymous too · would normally be
+    // stuck because neither id nor name matches let us suppress the
+    // row.
+    auth()->forgetGuards();
+    $pb = new PageBuilder();
+    $pb->mount(pageId: $page->id);
+
+    expect($pb->activeBlockLocks())->toHaveKey('blk-stuck'); // baseline before takeover
+
+    // Step 3 · click Take over.
+    expect($pb->takeOverBlockLock('blk-stuck'))->toBeTrue();
+
+    // Step 4 · the ribbon clears AND the green "You editing" path
+    // lights up. Both halves are what the user sees on screen.
+    expect($pb->activeBlockLocks())->not->toHaveKey('blk-stuck')
+        ->and($pb->myBlockLocks())->toHaveKey('blk-stuck');
+});
+
 it('takeOverBlockLock replaces the existing row and lets the new viewer claim the block', function () {
     $page = blPage();
 
