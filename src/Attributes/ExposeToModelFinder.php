@@ -19,6 +19,7 @@ namespace LoggedCloud\PageStudio\Attributes;
  *         label:      'Guest',
  *         findBy:     ['id', 'email', 'uuid'],
  *         searchable: ['name', 'email', 'phone'],
+ *         expose:     ['id', 'name', 'email'],
  *     )]
  *     class Customer extends Model {}
  *
@@ -26,9 +27,14 @@ namespace LoggedCloud\PageStudio\Attributes;
  *   class basename when omitted.
  * - `findBy` · columns the finder node can lookup by · becomes
  *   the per-model `finder_key` dropdown. Defaults to ['id'].
- * - `searchable` · columns a future fuzzy-search surface can
- *   use · stored on the record now so the attribute is the
- *   single source of truth.
+ * - `searchable` · columns a future fuzzy-search surface can use ·
+ *   stored on the record now so the attribute is the single source
+ *   of truth.
+ * - `expose` · columns that become per-field SOCKETS when the node
+ *   is set to "Expose fields as outputs". Allowlist · leave empty
+ *   to fall back to the model's Laravel `$hidden` filter, which
+ *   keeps sensitive cols like `password` / `remember_token` out by
+ *   default.
  */
 #[\Attribute(\Attribute::TARGET_CLASS)]
 class ExposeToModelFinder
@@ -36,10 +42,12 @@ class ExposeToModelFinder
     /**
      * @param array<int, string> $findBy
      * @param array<int, string> $searchable
+     * @param array<int, string> $expose
      */
     public function __construct(
         public ?string $label = null,
         public array $findBy = ['id'],
         public array $searchable = [],
+        public array $expose = [],
     ) {}
 }

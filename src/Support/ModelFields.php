@@ -58,6 +58,18 @@ class ModelFields
     }
 
     /**
+     * Seed the per-request cache for a class · used by tests that
+     * exercise dynamicOutputs / evaluate without spinning up a real
+     * DB schema. Production code should never call this.
+     *
+     * @param array<string, string> $fields
+     */
+    public static function seed(string $class, array $fields): void
+    {
+        self::$cache[$class] = $fields;
+    }
+
+    /**
      * Map a DBAL / Laravel column type onto one of the page-studio socket
      * type names. Unknown types fall through to `string` so the wire still
      * connects without a type mismatch warning.

@@ -122,7 +122,7 @@ it('writes and re-reads the cache file · accepts the legacy [fqcn => label] sha
     expect(file_exists($cache))->toBeTrue();
     $loaded = require $cache;
     expect($loaded)->toBe([
-        'App\\Models\\User' => ['label' => 'User', 'findBy' => ['id'], 'searchable' => []],
+        'App\\Models\\User' => ['label' => 'User', 'findBy' => ['id'], 'searchable' => [], 'expose' => []],
     ]);
 
     @unlink($cache);

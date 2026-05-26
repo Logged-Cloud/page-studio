@@ -75,6 +75,96 @@ it('PageBuilder::selectedNodeSchema merges the node\'s dynamicSettings into the 
     @unlink($cache);
 });
 
+it('dynamicOutputs filters socket list to the model\'s declared expose allowlist · password / remember_token never leak', function () {
+    // Cache the per-model record with an explicit allowlist that
+    // omits the sensitive cols.
+    $cache = ModelDiscovery::cachePath();
+    @mkdir(dirname($cache), 0755, true);
+    ModelDiscovery::writeRecordCache([
+        'AllowAcme\\Models\\User' => [
+            'label'      => 'User',
+            'findBy'     => ['id', 'email'],
+            'searchable' => ['name', 'email'],
+            'expose'     => ['id', 'name', 'email'],
+        ],
+    ], $cache);
+
+    // Stand in for ModelFields::for() · the test env has no DB so we
+    // seed what the live-schema scan would otherwise return.
+    \LoggedCloud\PageStudio\Support\ModelFields::seed('AllowAcme\\Models\\User', [
+        'id'              => 'int',
+        'name'            => 'string',
+        'email'           => 'string',
+        'password'        => 'string',
+        'remember_token'  => 'string',
+    ]);
+
+    $node = [
+        'type'     => 'source.model_finder',
+        'settings' => ['model_class' => 'AllowAcme\\Models\\User', 'finder_key' => 'id', 'expose_fields' => true],
+    ];
+    $instance = new \LoggedCloud\PageStudio\Nodes\Builtin\SourceModelFinderNode();
+    $outputs  = $instance->dynamicOutputs($node);
+
+    expect($outputs)->not->toBeNull()
+        ->and(array_keys($outputs))->toBe(['id', 'name', 'email'])
+        ->and($outputs)->not->toHaveKey('password')
+        ->and($outputs)->not->toHaveKey('remember_token');
+
+    @unlink($cache);
+    \LoggedCloud\PageStudio\Support\ModelFields::flush();
+});
+
+it('dynamicOutputs falls back to the model\'s Laravel $hidden when expose is not declared · password still excluded for the default case', function () {
+    // Build a model class with $hidden set on the fly · proves the
+    // fallback path consults the model's own hidden list rather than
+    // making the host author re-list cols in two places.
+    if (! class_exists('FallAcme\\Models\\UserHidden')) {
+        eval(
+            'namespace FallAcme\\Models;'
+            .'class UserHidden extends \\Illuminate\\Database\\Eloquent\\Model {'
+            .'    protected $hidden = ["password", "remember_token"];'
+            .'}'
+        );
+    }
+
+    $cache = ModelDiscovery::cachePath();
+    @mkdir(dirname($cache), 0755, true);
+    ModelDiscovery::writeRecordCache([
+        'FallAcme\\Models\\UserHidden' => [
+            'label'      => 'UserHidden',
+            'findBy'     => ['id'],
+            'searchable' => [],
+            'expose'     => [],
+        ],
+    ], $cache);
+
+    \LoggedCloud\PageStudio\Support\ModelFields::seed('FallAcme\\Models\\UserHidden', [
+        'id'              => 'int',
+        'name'            => 'string',
+        'email'           => 'string',
+        'password'        => 'string',
+        'remember_token'  => 'string',
+    ]);
+
+    $node = [
+        'type'     => 'source.model_finder',
+        'settings' => ['model_class' => 'FallAcme\\Models\\UserHidden', 'finder_key' => 'id', 'expose_fields' => true],
+    ];
+    $instance = new \LoggedCloud\PageStudio\Nodes\Builtin\SourceModelFinderNode();
+    $outputs  = $instance->dynamicOutputs($node);
+
+    expect($outputs)->not->toBeNull()
+        ->and($outputs)->not->toHaveKey('password')
+        ->and($outputs)->not->toHaveKey('remember_token')
+        ->and($outputs)->toHaveKey('id')
+        ->and($outputs)->toHaveKey('name')
+        ->and($outputs)->toHaveKey('email');
+
+    @unlink($cache);
+    \LoggedCloud\PageStudio\Support\ModelFields::flush();
+});
+
 it('dynamicSettings is null when no model is selected · leaves the bare text field default in place', function () {
     $node = ['type' => 'source.model_finder', 'settings' => ['model_class' => '']];
     $instance = new \LoggedCloud\PageStudio\Nodes\Builtin\SourceModelFinderNode();
