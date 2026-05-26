@@ -150,7 +150,12 @@
                     .ps-pb-grid.is-left-collapsed.is-right-collapsed {
                         grid-template-columns: 1fr;
                     }
-                    .ps-pb-rail {
+                    /* Selector bumped to .ps-pb-grid .ps-pb-rail so this
+                       beats the later unqualified .ps-pb-rail base rule
+                       in the cascade · before the bump the sheet showed a
+                       near-transparent background and the canvas blocks
+                       bled through. */
+                    .ps-pb-grid .ps-pb-rail {
                         position: fixed;
                         top: 0;
                         bottom: 0;
@@ -160,6 +165,14 @@
                         transition: transform .2s ease;
                         box-shadow: 0 8px 32px rgba(0,0,0,.45);
                     }
+                    /* Palette renders as a 2-column grid on phone so the
+                       full block library fits in fewer rows · the rail is
+                       already a sheet so vertical scrolling is fine, but
+                       tighter density makes the list approachable. The
+                       .ps-pb-grid prefix bumps specificity past the base
+                       .ps-pb-palette rule that follows in source order. */
+                    .ps-pb-grid .ps-pb-palette { grid-template-columns: 1fr 1fr; gap: .35rem; }
+                    .ps-pb-grid .ps-pb-palette-item { padding: .5rem .55rem; font-size: .8rem; }
                     .ps-pb-rail--left  { left: 0;  transform: translateX(-100%); grid-area: unset; }
                     .ps-pb-rail--right { right: 0; transform: translateX(100%);  grid-area: unset; }
                     /* On mobile the `is-...-collapsed` class means "closed" ·
