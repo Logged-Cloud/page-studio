@@ -116,6 +116,24 @@ class NodeGraphEngine
             foreach ($upstream[$id] ?? [] as $socket => $link) {
                 $inputs[$socket] = $outputs[$link['from_node']][$link['from_socket']] ?? null;
             }
+
+            // Settings-as-implicit-inputs · any wire whose target
+            // socket name matches a settable field for this node
+            // overrides the static setting value. Per-node opt-in
+            // not required · existing nodes that read $settings['x']
+            // see the wired value automatically.
+            //
+            // Skip null-valued wires so an unbound route variable
+            // doesn't wipe out a perfectly good static setting on
+            // the downstream node.
+            if (! empty($node['settings']) && is_array($node['settings'])) {
+                foreach ($inputs as $socketKey => $wiredValue) {
+                    if ($wiredValue === null) continue;
+                    if (! array_key_exists($socketKey, $node['settings'])) continue;
+                    $node['settings'][$socketKey] = $wiredValue;
+                }
+            }
+
             // Muted nodes act like a passthrough · the first input flows to
             // every output socket. Useful for temporarily bypassing a
             // transform without rewiring the graph.
