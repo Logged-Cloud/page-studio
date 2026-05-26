@@ -1048,6 +1048,26 @@
                     flex: 1;
                 }
 
+                /* ─── Variable drag-into-block caret ─────────────────────
+                   A thin vertical bar pinned to document.body that follows
+                   the cursor while a var chip is dragged over a block.
+                   Marks the insertion point so authors see where the
+                   token will land · `caretPositionFromPoint` computes the
+                   character offset, this just paints it. */
+                .ps-pb-var-drop-caret {
+                    position: fixed;
+                    width: 2px;
+                    height: 18px;
+                    background: var(--accent, #2C66E8);
+                    pointer-events: none;
+                    z-index: 9999;
+                    box-shadow: 0 0 6px color-mix(in srgb, var(--accent, #2C66E8) 60%, transparent);
+                    animation: ps-pb-var-caret-pulse 1s steps(2) infinite;
+                }
+                @keyframes ps-pb-var-caret-pulse {
+                    50% { opacity: .4; }
+                }
+
                 /* ─── Rail resize grabbers ────────────────────────────────
                    A 5px-wide strip on the inner edge of each rail. Cursor
                    tweens to col-resize, drag updates the matching Alpine

@@ -26,12 +26,22 @@
     data-parent-path="{{ $parentPath }}"
     data-slot="{{ $slot === null ? '' : $slot }}"
     data-index="{{ $index }}"
+    data-accept-var-drop="true"
     @click.stop="$wire.selectBlock(@js($path))"
     @contextmenu.prevent.stop="openBlockCtxMenu($event, @js($path))"
     draggable="true"
     @dragstart.stop="onBlockDragStart($event, @js($path))"
-    @dragover.prevent.stop="onBlockDragOver($event, @js($parentPath), {{ $slotJson }}, {{ $index }})"
-    @drop.prevent.stop="onBlockDrop($event, @js($parentPath), {{ $slotJson }}, {{ $index }})"
+    @dragover.prevent.stop="
+        const types = Array.from($event.dataTransfer?.types || []);
+        if (types.includes('application/x-page-studio-var')) { onVarDragOver($event, @js($path)); return; }
+        onBlockDragOver($event, @js($parentPath), {{ $slotJson }}, {{ $index }});
+    "
+    @dragleave="onVarDragLeave($event)"
+    @drop.prevent.stop="
+        const types = Array.from($event.dataTransfer?.types || []);
+        if (types.includes('application/x-page-studio-var')) { onVarDrop($event, @js($path)); return; }
+        onBlockDrop($event, @js($parentPath), {{ $slotJson }}, {{ $index }});
+    "
     @pointerdown="startTouchDrag($event, 'block', @js($path), @js($block['type']))"
 >
     @if ($lockedBy)

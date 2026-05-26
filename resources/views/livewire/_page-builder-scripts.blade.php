@@ -385,6 +385,86 @@
                             }
                         },
 
+                        // Var-chip drag · while a chip is dragged over a
+                        // block in the canvas we paint a small "|" caret
+                        // showing the insertion point. On drop the server
+                        // method splices the @{{ varname }} token at that
+                        // offset.
+                        // varDragCaret stores the floating indicator
+                        // element so onVarDragLeave can remove it.
+                        varDragCaret: null,
+                        varDragInsert: { path: '', offset: -1, varName: '' },
+                        onVarDragOver(event, path) {
+                            // Only act when the drag payload is a var chip
+                            // (the strip set application/x-page-studio-var).
+                            const types = event.dataTransfer?.types || [];
+                            const has = Array.from(types).includes('application/x-page-studio-var');
+                            if (! has) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            const varName = event.dataTransfer.getData('application/x-page-studio-var') || '';
+                            const block = event.currentTarget;
+                            // Find the rendered-text element inside the
+                            // block so caretPositionFromPoint snaps to a
+                            // character. .ps-pb-block-render is the inline
+                            // preview; settings-driven blocks render here.
+                            const target = block.querySelector('.ps-pb-block-render') || block;
+                            let offset = -1, caretX = event.clientX, caretY = event.clientY;
+                            const cp = (document.caretPositionFromPoint && document.caretPositionFromPoint(event.clientX, event.clientY))
+                                || (document.caretRangeFromPoint && document.caretRangeFromPoint(event.clientX, event.clientY));
+                            if (cp) {
+                                offset = cp.offset ?? cp.startOffset ?? -1;
+                                const node = cp.offsetNode || cp.startContainer;
+                                if (node) {
+                                    const range = document.createRange();
+                                    try {
+                                        range.setStart(node, Math.min(offset, (node.textContent || '').length));
+                                        range.setEnd(node, Math.min(offset, (node.textContent || '').length));
+                                        const r = range.getBoundingClientRect();
+                                        if (r.height) { caretX = r.left; caretY = r.top; }
+                                    } catch (_) {}
+                                }
+                            }
+
+                            this.varDragInsert = { path, offset, varName };
+
+                            // Paint / move the caret indicator.
+                            if (! this.varDragCaret) {
+                                const el = document.createElement('div');
+                                el.className = 'ps-pb-var-drop-caret';
+                                document.body.appendChild(el);
+                                this.varDragCaret = el;
+                            }
+                            const c = this.varDragCaret;
+                            c.style.left = caretX + 'px';
+                            c.style.top  = caretY + 'px';
+                            const tr = target.getBoundingClientRect();
+                            c.style.height = (tr.height > 0 ? Math.min(tr.height, 28) : 18) + 'px';
+                        },
+                        onVarDragLeave(event) {
+                            const types = event.dataTransfer?.types || [];
+                            if (! Array.from(types).includes('application/x-page-studio-var')) return;
+                            if (this.varDragCaret) {
+                                this.varDragCaret.remove();
+                                this.varDragCaret = null;
+                            }
+                        },
+                        onVarDrop(event, path) {
+                            const types = event.dataTransfer?.types || [];
+                            if (! Array.from(types).includes('application/x-page-studio-var')) return;
+                            event.preventDefault();
+                            event.stopPropagation();
+
+                            const varName = event.dataTransfer.getData('application/x-page-studio-var') || '';
+                            if (this.varDragCaret) {
+                                this.varDragCaret.remove();
+                                this.varDragCaret = null;
+                            }
+                            if (! varName) return;
+                            this.$wire.insertVarIntoBlock(path, varName, null, this.varDragInsert.offset ?? -1);
+                        },
+
                         onPaletteDragStart(e, type) {
                             this.dragKind = 'palette';
                             this.dragPayload = type;
