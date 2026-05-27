@@ -1163,11 +1163,30 @@ class PageBuilder extends Component
         $byId = [];
         foreach ($this->nodes as $i => $node) $byId[$node['id']] = $i;
 
+        // Per-node height estimate · header + footer plus a row per
+        // input / output / settable field. After the on-node settings
+        // refactor (v2.8.0) node heights vary a lot, so a flat
+        // y-stride would leave tall nodes overlapping their
+        // neighbours in the same column. Walk down each column with
+        // an accumulator instead of using row * H.
+        $library = config('page-studio.nodes', []);
+        $estimateHeight = function (string $nodeId) use ($byId, $library): int {
+            $type   = $this->nodes[$byId[$nodeId]]['type'] ?? '';
+            $schema = $library[$type] ?? [];
+            $rows   = count($schema['inputs']   ?? [])
+                    + count($schema['outputs']  ?? [])
+                    + count($schema['settings'] ?? []);
+            // ~50px chrome (header + footer padding) + ~24px per row.
+            return 50 + $rows * 24;
+        };
+        $GAP = 24;
+
         foreach ($cols as $col => $ids) {
             $x = $START_X + ($col + $offset) * $W;
-            foreach (array_values($ids) as $row => $id) {
-                $y = $START_Y + $row * $H;
+            $y = $START_Y;
+            foreach (array_values($ids) as $id) {
                 $this->nodes[$byId[$id]]['position'] = ['x' => $x, 'y' => $y];
+                $y += $estimateHeight($id) + $GAP;
             }
         }
     }
