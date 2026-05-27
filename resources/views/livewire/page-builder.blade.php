@@ -840,7 +840,9 @@
         <div class="ps-pb-var-strip"
              role="toolbar"
              aria-label="Page variables"
-             :style="`bottom: calc(var(--ps-pb-drawer-h, 0) + ${$wire.drawerOpen ? 0 : 8}px)`">
+             :style="$wire.drawerOpen
+                        ? `bottom: calc(var(--ps-pb-drawer-h, 0px) + 0px)`
+                        : `bottom: 8px`">
             <span class="ps-pb-var-strip-label">Variables</span>
             <div class="ps-pb-var-strip-track">
                 @foreach ($this->variables as $v)
