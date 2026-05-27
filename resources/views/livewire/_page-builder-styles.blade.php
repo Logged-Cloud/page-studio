@@ -227,17 +227,34 @@
                         height: 100dvh !important;
                         z-index: 70 !important;
                     }
+                    /* The JS-driven --ps-pb-drawer-h CSS variable
+                       carries the desktop drawer height (352px by
+                       default) and doesn't always reset to 0 when
+                       the drawer closes · so the page-builder grid
+                       was reserving 404px of padding-bottom for a
+                       drawer that's actually full-screen on mobile.
+                       Force it to 0 on phones · the drawer covers
+                       the whole viewport when open anyway, so there
+                       is nothing to reserve. */
+                    :root { --ps-pb-drawer-h: 0px !important; }
+
                     /* Var-strip pinned to the bottom edge regardless
-                       of the JS-driven --ps-pb-drawer-h. Without this
-                       override the strip floats up to wherever the
-                       inline style puts it (mid-screen on mobile
-                       because the JS variable still carries the
-                       desktop drawer height). z-index above the
-                       drawer so it stays visible + draggable while
-                       the drawer is open. */
+                       of the JS-driven --ps-pb-drawer-h. z-index
+                       above the drawer so it stays visible +
+                       draggable while the drawer is open. */
                     .ps-pb-var-strip {
                         bottom: 0 !important;
                         z-index: 80 !important;
+                    }
+                    /* Tuck handle should float ABOVE the var-strip so
+                       the two don't overlap at the bottom of the
+                       screen. The strip is ~42px tall · push the
+                       handle up by that + a small gap. z-index is
+                       higher than the strip so the pill renders on
+                       top in case of any sliver of overlap. */
+                    .ps-ne-tuck-handle {
+                        bottom: 54px !important;
+                        z-index: 85 !important;
                     }
                     /* Make absolutely sure the canvas inside the
                        drawer reclaims the full width on mobile · the
