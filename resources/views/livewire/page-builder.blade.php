@@ -266,7 +266,7 @@
     @else
         <div class="ps-pb-grid"
              :class="(leftCollapsed ? 'is-left-collapsed ' : '')
-                + ((rightCollapsed || (! $wire.selectedPath && ! $wire.selectedNodeId)) ? 'is-right-collapsed' : '')"
+                + ((rightCollapsed || ! $wire.selectedPath) ? 'is-right-collapsed' : '')"
              :style="`--rail-l: ${leftRailW}px; --rail-r: ${rightRailW}px`">
 
             {{-- ─── LEFT · components grouped + variables panel ─── --}}
@@ -436,7 +436,7 @@
 
             {{-- ─── RIGHT · settings + comments + activity panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--right"
-                   x-show="! rightCollapsed && ($wire.selectedPath || $wire.selectedNodeId || ['comments','activity','seo','a11y'].includes(rightTab))" x-cloak>
+                   x-show="! rightCollapsed && ($wire.selectedPath || ['comments','activity','seo','a11y'].includes(rightTab))" x-cloak>
                 <button type="button"
                         class="ps-pb-rail-grabber ps-pb-rail-grabber--left"
                         @pointerdown="startRailResize($event, 'right')"
