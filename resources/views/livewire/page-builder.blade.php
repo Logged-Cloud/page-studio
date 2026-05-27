@@ -8,11 +8,17 @@
     @keydown.window.alt.up.prevent="if ($wire.selectedPath) $wire.moveSelectedBlock(-1)"
     @keydown.window.alt.down.prevent="if ($wire.selectedPath) $wire.moveSelectedBlock(1)"
     class="ps-page-builder"
-    x-effect="
-        const h = $wire.drawerOpen ? (parseInt(localStorage.getItem('psPbDrawerH') || '352')) : 0;
-        document.documentElement.style.setProperty('--ps-pb-drawer-h', h + 'px');
-    "
     x-init="
+        // Keep --ps-pb-drawer-h in sync with the Livewire drawerOpen
+        // prop · x-effect on a $wire getter doesn't always re-run when
+        // the Livewire snapshot changes, so use an explicit $watch.
+        const syncDrawerH = () => {
+            const h = $wire.drawerOpen ? (parseInt(localStorage.getItem('psPbDrawerH') || '352')) : 0;
+            document.documentElement.style.setProperty('--ps-pb-drawer-h', h + 'px');
+        };
+        syncDrawerH();
+        $watch(() => $wire.drawerOpen, syncDrawerH);
+
         $watch('leftRailW',    v => localStorage.setItem('psPbLeftRailW',    String(v)));
         $watch('rightRailW',   v => localStorage.setItem('psPbRightRailW',   String(v)));
         $watch('neLeftRailW',  v => localStorage.setItem('psPbNeLeftRailW',  String(v)));
