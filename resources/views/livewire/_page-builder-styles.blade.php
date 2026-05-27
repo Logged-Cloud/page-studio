@@ -44,6 +44,13 @@
                     background: var(--surface-2, #1E1F22);
                     border-bottom: 1px solid var(--line, #3A3D40);
                     flex-shrink: 0;
+                    /* Wrap whenever the row would overflow the
+                       viewport, at any width · stacking to a second
+                       row is always preferable to a horizontal scroll
+                       bar on the editor's main chrome. row-gap keeps
+                       the wrapped rows visually distinct. */
+                    flex-wrap: wrap;
+                    row-gap: .35rem;
                 }
                 .ps-pb-route { display: flex; align-items: center; gap: .55rem; font-family: ui-monospace, monospace; font-size: .85rem; }
                 .ps-pb-method { background: rgba(34,197,94,.2); color: #22c55e; border-radius: .25rem; padding: .1rem .4rem; font-weight: 700; font-size: .7rem; }
@@ -1370,6 +1377,11 @@
                     background: rgba(0,0,0,.15);
                     border-bottom: 1px solid var(--line, #3A3D40);
                     flex-shrink: 0;
+                    /* Wrap when content overflows · same reasoning as
+                       .ps-pb-topbar · stacking beats horizontal scroll
+                       for the editor's chrome on any viewport. */
+                    flex-wrap: wrap;
+                    row-gap: .35rem;
                 }
                 .ps-ne-title {
                     font-size: .75rem;
