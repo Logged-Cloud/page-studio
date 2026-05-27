@@ -1956,6 +1956,162 @@
                     stroke-width: 2;
                 }
 
+                /* ─── Weapon-wheel context menu ──────────────────────
+                   Right-click on the canvas pops a GTA-style radial
+                   picker. Stage 1 (.ps-ne-wheel-svg) shows a donut
+                   of category slices. Stage 2 (.ps-ne-wheel-panel)
+                   replaces the wheel with a list of nodes in the
+                   chosen category. The whole thing is positioned by
+                   the inline :style at the wheel root and centred
+                   with translate(-50%, -50%) so it pops at the
+                   cursor. */
+                .ps-ne-wheel {
+                    position: absolute;
+                    z-index: 60;
+                    transform: translate(-50%, -50%);
+                    /* No card chrome at wheel level · the SVG paints
+                       its own background. */
+                    pointer-events: none;
+                }
+                .ps-ne-wheel > * { pointer-events: auto; }
+                .ps-ne-wheel-svg {
+                    width: 280px;
+                    height: 280px;
+                    overflow: visible;
+                    filter: drop-shadow(0 12px 32px rgba(0,0,0,.55));
+                }
+                .ps-ne-wheel-hub {
+                    fill: var(--surface-2, #1E1F22);
+                    stroke: var(--line, #3A3D40);
+                    stroke-width: 2;
+                }
+                .ps-ne-wheel-hub-label,
+                .ps-ne-wheel-hub-hint {
+                    text-anchor: middle;
+                    fill: var(--ink, #F0EDE5);
+                    pointer-events: none;
+                }
+                .ps-ne-wheel-hub-label {
+                    font-size: 14px;
+                    font-weight: 600;
+                }
+                .ps-ne-wheel-hub-hint {
+                    font-size: 10px;
+                    fill: var(--ink-dim, #A3A099);
+                    letter-spacing: .04em;
+                    text-transform: uppercase;
+                }
+                .ps-ne-wheel-slice {
+                    cursor: pointer;
+                    transition: transform .12s ease;
+                    transform-origin: 140px 140px;
+                }
+                .ps-ne-wheel-slice.is-hover { transform: scale(1.05); }
+                .ps-ne-wheel-slice-fill {
+                    fill: rgba(255,255,255,.06);
+                    stroke: var(--line, #3A3D40);
+                    stroke-width: 1;
+                    transition: fill .15s ease, stroke .15s ease;
+                }
+                .ps-ne-wheel-slice.is-hover .ps-ne-wheel-slice-fill {
+                    fill: color-mix(in srgb, var(--accent, #2C66E8) 28%, var(--surface-2, #1E1F22));
+                    stroke: color-mix(in srgb, var(--accent, #2C66E8) 60%, var(--line, #3A3D40));
+                }
+                /* Per-group accent tints · the slice colour hints at
+                   the group at a glance. */
+                .ps-ne-wheel-slice--source    { --slice-accent: #E11D48; }
+                .ps-ne-wheel-slice--transform { --slice-accent: #2C66E8; }
+                .ps-ne-wheel-slice--image     { --slice-accent: #16A34A; }
+                .ps-ne-wheel-slice--convert   { --slice-accent: #F59E0B; }
+                .ps-ne-wheel-slice--output    { --slice-accent: #A855F7; }
+                .ps-ne-wheel-slice--note      { --slice-accent: #FACC15; }
+                .ps-ne-wheel-slice--variables { --slice-accent: #06B6D4; }
+                .ps-ne-wheel-slice.is-hover .ps-ne-wheel-slice-fill {
+                    fill: color-mix(in srgb, var(--slice-accent, #2C66E8) 36%, var(--surface-2, #1E1F22));
+                    stroke: color-mix(in srgb, var(--slice-accent, #2C66E8) 80%, var(--line, #3A3D40));
+                }
+                .ps-ne-wheel-slice-icon {
+                    text-anchor: middle;
+                    fill: var(--ink, #F0EDE5);
+                    font-size: 18px;
+                    pointer-events: none;
+                }
+                .ps-ne-wheel-slice-label {
+                    text-anchor: middle;
+                    fill: var(--ink, #F0EDE5);
+                    font-size: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: .06em;
+                    pointer-events: none;
+                }
+
+                .ps-ne-wheel-panel {
+                    width: 280px;
+                    max-height: 380px;
+                    background: var(--surface-2, #1E1F22);
+                    border: 1px solid var(--line, #3A3D40);
+                    border-radius: .65rem;
+                    box-shadow: 0 12px 32px rgba(0,0,0,.55);
+                    display: flex;
+                    flex-direction: column;
+                    overflow: hidden;
+                }
+                .ps-ne-wheel-panel-bar {
+                    display: flex;
+                    align-items: center;
+                    gap: .5rem;
+                    padding: .45rem .6rem;
+                    border-bottom: 1px solid var(--line, #3A3D40);
+                }
+                .ps-ne-wheel-back {
+                    background: transparent;
+                    border: 1px solid var(--line, #3A3D40);
+                    color: var(--ink, #F0EDE5);
+                    border-radius: .3rem;
+                    padding: 0 .55rem;
+                    height: 1.6rem;
+                    cursor: pointer;
+                    font-size: .85rem;
+                }
+                .ps-ne-wheel-back:hover { background: rgba(255,255,255,.06); }
+                .ps-ne-wheel-panel-title {
+                    font-size: .75rem;
+                    text-transform: uppercase;
+                    letter-spacing: .08em;
+                    color: var(--ink-dim, #A3A099);
+                }
+                .ps-ne-wheel-panel-list {
+                    overflow-y: auto;
+                    padding: .35rem .35rem .55rem;
+                    display: flex;
+                    flex-direction: column;
+                    gap: .15rem;
+                }
+                .ps-ne-wheel-item {
+                    display: grid;
+                    grid-template-columns: 1.5rem 1fr auto;
+                    align-items: center;
+                    gap: .55rem;
+                    background: transparent;
+                    border: 0;
+                    color: var(--ink, #F0EDE5);
+                    text-align: left;
+                    padding: .4rem .55rem;
+                    font: inherit;
+                    font-size: .8rem;
+                    border-radius: .3rem;
+                    cursor: pointer;
+                }
+                .ps-ne-wheel-item:hover { background: rgba(255,255,255,.06); }
+                .ps-ne-wheel-item-icon { font-size: 1rem; opacity: .9; }
+                .ps-ne-wheel-item-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+                .ps-ne-wheel-item-label code { font-size: .8em; opacity: .9; }
+                .ps-ne-wheel-item-hint {
+                    font-size: .7rem;
+                    color: var(--ink-dim, #A3A099);
+                    font-style: italic;
+                }
+
                 .ps-ne-ctx-menu {
                     position: absolute;
                     z-index: 60;

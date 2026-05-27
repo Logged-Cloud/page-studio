@@ -1396,38 +1396,108 @@
                         </svg>
                     </div>
 
-                    {{-- ─── Right-click context menu on the canvas ──────────── --}}
+                    {{-- ─── Right-click weapon-wheel context menu ───
+                         GTA-style radial picker · stage 1 shows a
+                         donut of categories, stage 2 expands the
+                         selected category into a panel of nodes.
+                         The geometry helpers + state live in
+                         pageStudioNodeCanvas (wheelSlicePath etc).
+                         Centred on the cursor via translate(-50%) ·
+                         ctxMenu.x/y are viewport-local. --}}
+                    @php
+                        $wheelGroups = [];
+                        if (! empty($this->variables)) $wheelGroups['variables'] = ['🔣', 'Variables'];
+                        $groupIcons = [
+                            'source'    => ['⇥', 'Source'],
+                            'transform' => ['⚙', 'Transform'],
+                            'image'     => ['🖼', 'Image'],
+                            'convert'   => ['⇄', 'Convert'],
+                            'output'    => ['▶', 'Output'],
+                            'note'      => ['📌', 'Note'],
+                        ];
+                        foreach (array_keys($this->nodeLibrary) as $g) {
+                            $wheelGroups[$g] = $groupIcons[$g] ?? ['•', ucfirst($g)];
+                        }
+                        $wheelGroupList = array_keys($wheelGroups);
+                    @endphp
                     <div
                         x-show="ctxMenu.open"
                         x-cloak
                         :style="`top:${ctxMenu.y}px;left:${ctxMenu.x}px`"
                         @click.outside="closeCtxMenu()"
                         @keydown.escape.window="closeCtxMenu()"
-                        class="ps-ne-ctx-menu"
+                        class="ps-ne-wheel"
                         role="menu"
                     >
-                        @if (! empty($this->variables))
-                            <div class="ps-ne-ctx-section">Insert variable</div>
-                            @foreach ($this->variables as $v)
-                                <button type="button" class="ps-ne-ctx-item"
-                                        @click.stop="dropVarHere(@js($v['name']))"
-                                        role="menuitem">
-                                    <code>&#123;&#123; {{ $v['name'] }} &#125;&#125;</code>
-                                    <span class="ps-ne-ctx-preview">{{ $v['preview'] }}</span>
-                                </button>
+                        {{-- Stage 1 · the wheel itself --}}
+                        <svg viewBox="0 0 280 280" class="ps-ne-wheel-svg"
+                             x-show="! ctxMenu.expandedGroup">
+                            <circle cx="140" cy="140" r="50" class="ps-ne-wheel-hub"/>
+                            <text x="140" y="138" class="ps-ne-wheel-hub-label"
+                                  x-text="ctxMenu.hoveredGroup
+                                      ? @js($wheelGroups)[ctxMenu.hoveredGroup]?.[1]
+                                      : 'Add node'"></text>
+                            <text x="140" y="156" class="ps-ne-wheel-hub-hint">right-click anywhere</text>
+                            @foreach ($wheelGroupList as $i => $group)
+                                @php $n = count($wheelGroupList); @endphp
+                                <g class="ps-ne-wheel-slice"
+                                   :class="ctxMenu.hoveredGroup === @js($group) ? 'is-hover' : ''"
+                                   @mouseenter="ctxMenu.hoveredGroup = @js($group)"
+                                   @mouseleave="ctxMenu.hoveredGroup = null"
+                                   @click.stop="ctxMenu.expandedGroup = @js($group)"
+                                   role="menuitem">
+                                    <path :d="wheelSlicePath({{ $i }}, {{ $n }})" class="ps-ne-wheel-slice-fill ps-ne-wheel-slice--{{ $group }}"/>
+                                    @php
+                                        $labelExpr = "wheelSliceLabel($i, $n)";
+                                    @endphp
+                                    <text :x="{{ $labelExpr }}.x"
+                                          :y="{{ $labelExpr }}.y - 6"
+                                          class="ps-ne-wheel-slice-icon">{{ $wheelGroups[$group][0] }}</text>
+                                    <text :x="{{ $labelExpr }}.x"
+                                          :y="{{ $labelExpr }}.y + 14"
+                                          class="ps-ne-wheel-slice-label">{{ $wheelGroups[$group][1] }}</text>
+                                </g>
                             @endforeach
-                        @endif
+                        </svg>
 
-                        @foreach ($this->nodeLibrary as $group => $types)
-                            <div class="ps-ne-ctx-section">{{ ucfirst($group) }}</div>
-                            @foreach ($types as $key => $def)
-                                <button type="button" class="ps-ne-ctx-item"
-                                        @click.stop="dropNodeHere(@js($key))"
-                                        role="menuitem">
-                                    <span class="ps-ne-ctx-icon">{{ $def['icon'] }}</span>
-                                    <span>{{ $def['label'] }}</span>
-                                </button>
-                            @endforeach
+                        {{-- Stage 2 · the chosen category's items --}}
+                        @foreach ($wheelGroupList as $group)
+                            <div class="ps-ne-wheel-panel"
+                                 x-show="ctxMenu.expandedGroup === @js($group)"
+                                 x-cloak>
+                                <header class="ps-ne-wheel-panel-bar">
+                                    <button type="button" class="ps-ne-wheel-back"
+                                            @click.stop="ctxMenu.expandedGroup = null"
+                                            title="Back to wheel">←</button>
+                                    <span class="ps-ne-wheel-panel-title">{{ $wheelGroups[$group][1] }}</span>
+                                </header>
+                                <div class="ps-ne-wheel-panel-list">
+                                    @if ($group === 'variables')
+                                        @foreach ($this->variables as $v)
+                                            <button type="button" class="ps-ne-wheel-item"
+                                                    @click.stop="dropVarHere(@js($v['name']))"
+                                                    role="menuitem">
+                                                <span class="ps-ne-wheel-item-icon">🔣</span>
+                                                <span class="ps-ne-wheel-item-label">
+                                                    <code>&#123;&#123; {{ $v['name'] }} &#125;&#125;</code>
+                                                </span>
+                                                @if (! empty($v['preview']))
+                                                    <span class="ps-ne-wheel-item-hint">{{ \Illuminate\Support\Str::limit((string) $v['preview'], 24) }}</span>
+                                                @endif
+                                            </button>
+                                        @endforeach
+                                    @else
+                                        @foreach (($this->nodeLibrary)[$group] ?? [] as $key => $def)
+                                            <button type="button" class="ps-ne-wheel-item"
+                                                    @click.stop="dropNodeHere(@js($key))"
+                                                    role="menuitem">
+                                                <span class="ps-ne-wheel-item-icon">{{ $def['icon'] ?? '•' }}</span>
+                                                <span class="ps-ne-wheel-item-label">{{ $def['label'] ?? $key }}</span>
+                                            </button>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
                         @endforeach
                     </div>
 
