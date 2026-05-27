@@ -1029,6 +1029,41 @@
                         },
 
                         onCanvasPointerDown(e) {
+                            // Touch pan · single-finger drag on the canvas
+                            // background pans the stage. The same gesture
+                            // on desktop is reserved for marquee selection,
+                            // but touchscreens have no middle-mouse / Alt
+                            // shortcut, so a finger drag IS the pan
+                            // gesture. Nodes / sockets / viewport controls
+                            // get a pass · they have their own
+                            // pointerdown handlers.
+                            if (e.pointerType === 'touch'
+                                && ! e.target.closest('.ps-ne-node, .ps-ne-socket, .ps-ne-viewport-ctl, .ps-ne-wire')) {
+                                e.preventDefault();
+                                this.panDrag = {
+                                    startX: e.clientX, startY: e.clientY,
+                                    originX: this.pan.x, originY: this.pan.y,
+                                };
+                                const onMove = (ev) => {
+                                    if (ev.pointerType !== 'touch') return;
+                                    this.pan = {
+                                        x: this.panDrag.originX + (ev.clientX - this.panDrag.startX),
+                                        y: this.panDrag.originY + (ev.clientY - this.panDrag.startY),
+                                    };
+                                    this.queueRedraw();
+                                };
+                                const onUp = () => {
+                                    window.removeEventListener('pointermove', onMove);
+                                    window.removeEventListener('pointerup',   onUp);
+                                    window.removeEventListener('pointercancel', onUp);
+                                    this.panDrag = null;
+                                };
+                                window.addEventListener('pointermove', onMove);
+                                window.addEventListener('pointerup',   onUp);
+                                window.addEventListener('pointercancel', onUp);
+                                return;
+                            }
+
                             // Middle-mouse drag (or Alt + left) pans the stage.
                             if (e.button === 1 || (e.button === 0 && e.altKey)) {
                                 e.preventDefault();
