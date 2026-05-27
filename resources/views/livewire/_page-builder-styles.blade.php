@@ -213,9 +213,18 @@
                     .ps-pb-device-toggle { display: none; }
                     /* Email-meta strip also wraps + tightens. */
                     .ps-pb-email-meta { grid-template-columns: 1fr !important; gap: .35rem !important; padding: .5rem .65rem !important; }
-                    /* Drawer fills the viewport bottom · resize grabber is
-                       disabled because pointer events fight touch scroll. */
-                    .ps-ne-drawer { height: 80vh !important; }
+                    /* Drawer goes full-screen on mobile · the canvas
+                       is hidden underneath so the author has the
+                       whole viewport to work with. 100dvh respects
+                       the mobile address bar shrink/grow. The
+                       drawer's own header carries the close button
+                       (tuck handle is display:none while open). */
+                    .ps-ne-drawer {
+                        top: 0 !important;
+                        height: 100vh !important;
+                        height: 100dvh !important;
+                        z-index: 65 !important;
+                    }
                     .ps-ne-grabber { display: none; }
                     .ps-ne-grid    { grid-template-columns: 1fr; grid-template-areas: "canvas"; }
                     /* Node-editor palette + settings on phone · fixed sheets
