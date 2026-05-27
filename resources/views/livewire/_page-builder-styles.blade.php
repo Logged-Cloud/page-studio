@@ -202,31 +202,26 @@
                        The actions group also wraps so the publish + save
                        buttons sit on a second line rather than overflowing
                        horizontally and clipping at the viewport edge. */
-                    /* The topbar + drawer-bar previously wrapped to a
-                       second/third row on mobile which got tall and
-                       awkward. Switch to a single-row horizontally
-                       scrollable strip so every button stays
-                       reachable. Children that were flex-wrappable
-                       must not shrink · the row scrolls as a whole. */
+                    /* Topbar + drawer-bar on mobile · wrap to as many
+                       rows as needed so every button is visible
+                       without horizontal swiping, but keep the
+                       padding tight so the bar doesn't dominate the
+                       screen. The action groups stay right-aligned
+                       within their row via margin-left: auto. */
                     .ps-pb-topbar,
                     .ps-ne-drawer-bar {
-                        flex-wrap: nowrap !important;
-                        overflow-x: auto;
-                        overflow-y: hidden;
-                        gap: .35rem;
-                        padding: .5rem .65rem;
-                        scrollbar-width: thin;
-                        -webkit-overflow-scrolling: touch;
+                        flex-wrap: wrap !important;
+                        gap: .3rem;
+                        padding: .4rem .55rem;
+                        row-gap: .35rem;
                     }
-                    .ps-pb-topbar > *,
-                    .ps-ne-drawer-bar > * { flex-shrink: 0; }
-                    /* The right-aligned actions block was using
-                       margin-left:auto to push to the far end. With
-                       a horizontal scroll container that breaks the
-                       layout · drop the auto margin and let actions
-                       sit inline with the rest. */
-                    .ps-pb-topbar .ps-pb-actions,
-                    .ps-ne-drawer-bar .ps-ne-drawer-actions { margin-left: 0; }
+                    .ps-pb-topbar .ps-pb-btn,
+                    .ps-ne-drawer-bar .ps-pb-btn,
+                    .ps-pb-topbar button,
+                    .ps-ne-drawer-bar button {
+                        padding: .25rem .5rem;
+                        font-size: .75rem;
+                    }
                     .ps-pb-topbar code.ps-pb-path { font-size: .75rem; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
                     .ps-pb-actions { flex-wrap: wrap; gap: .35rem; row-gap: .35rem; }
                     .ps-pb-btn { padding: .3rem .55rem; font-size: .75rem; }
