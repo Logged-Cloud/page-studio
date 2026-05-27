@@ -221,10 +221,24 @@
                        (tuck handle is display:none while open). */
                     .ps-ne-drawer {
                         top: 0 !important;
+                        left: 0 !important;
+                        right: 0 !important;
+                        width: 100vw !important;
                         height: 100vh !important;
                         height: 100dvh !important;
-                        z-index: 65 !important;
+                        z-index: 70 !important;
                     }
+                    /* The var-strip's bottom offset is driven by a
+                       JS-set --ps-pb-drawer-h CSS variable. That
+                       variable carries the desktop drawer height
+                       (352px by default) even when the mobile
+                       full-screen rule has overridden the actual
+                       drawer to 100dvh, so the strip floats up to
+                       roughly mid-screen. Just hide the strip while
+                       the drawer is full-screen · the same vars are
+                       reachable from the in-drawer Variables list. */
+                    body:has(.ps-ne-drawer) .ps-pb-var-strip,
+                    body:has(.ps-ne-tuck-handle.is-open) .ps-pb-var-strip { display: none !important; }
                     .ps-ne-grabber { display: none; }
                     .ps-ne-grid    { grid-template-columns: 1fr; grid-template-areas: "canvas"; }
                     /* Node-editor palette + settings on phone · fixed sheets
