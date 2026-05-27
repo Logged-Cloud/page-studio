@@ -247,7 +247,19 @@
                     .ps-ne-stage-wrap,
                     .ps-ne-canvas { width: 100% !important; }
                     .ps-ne-grabber { display: none; }
-                    .ps-ne-grid    { grid-template-columns: 1fr; grid-template-areas: "canvas"; }
+                    /* Phone grid: ONE column · the palette + settings
+                       are absolute/fixed sheets on mobile (rules
+                       below) so the grid only needs to hand the
+                       canvas its full width. Source-order rules
+                       elsewhere in this file would otherwise reapply
+                       the desktop 3-column layout (palette + canvas
+                       + settings), squishing the canvas to a thin
+                       middle column · !important wins the cascade. */
+                    .ps-ne-grid {
+                        grid-template-columns: 1fr !important;
+                        grid-template-areas: "canvas" !important;
+                    }
+                    .ps-ne-grid--palette-closed { grid-template-columns: 1fr !important; }
                     /* Node-editor palette + settings on phone · fixed sheets
                        slid in from the edges. Visibility is now driven by
                        x-show on the elements themselves (nodePaletteCollapsed +
