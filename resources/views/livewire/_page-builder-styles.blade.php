@@ -202,7 +202,31 @@
                        The actions group also wraps so the publish + save
                        buttons sit on a second line rather than overflowing
                        horizontally and clipping at the viewport edge. */
-                    .ps-pb-topbar { flex-wrap: wrap; gap: .35rem; padding: .5rem .65rem; }
+                    /* The topbar + drawer-bar previously wrapped to a
+                       second/third row on mobile which got tall and
+                       awkward. Switch to a single-row horizontally
+                       scrollable strip so every button stays
+                       reachable. Children that were flex-wrappable
+                       must not shrink · the row scrolls as a whole. */
+                    .ps-pb-topbar,
+                    .ps-ne-drawer-bar {
+                        flex-wrap: nowrap !important;
+                        overflow-x: auto;
+                        overflow-y: hidden;
+                        gap: .35rem;
+                        padding: .5rem .65rem;
+                        scrollbar-width: thin;
+                        -webkit-overflow-scrolling: touch;
+                    }
+                    .ps-pb-topbar > *,
+                    .ps-ne-drawer-bar > * { flex-shrink: 0; }
+                    /* The right-aligned actions block was using
+                       margin-left:auto to push to the far end. With
+                       a horizontal scroll container that breaks the
+                       layout · drop the auto margin and let actions
+                       sit inline with the rest. */
+                    .ps-pb-topbar .ps-pb-actions,
+                    .ps-ne-drawer-bar .ps-ne-drawer-actions { margin-left: 0; }
                     .ps-pb-topbar code.ps-pb-path { font-size: .75rem; max-width: 60vw; overflow: hidden; text-overflow: ellipsis; }
                     .ps-pb-actions { flex-wrap: wrap; gap: .35rem; row-gap: .35rem; }
                     .ps-pb-btn { padding: .3rem .55rem; font-size: .75rem; }
