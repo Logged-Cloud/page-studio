@@ -185,6 +185,39 @@
                        slide-over sheets controlled by the toolbar toggles.
                        The bottom drawer (node editor) becomes a full-screen
                        overlay so touch users get a real surface to work on. */
+
+                /* ─── Drawer · full viewport on ALL widths ───────────
+                   The Variables Modifier used to be a bottom sheet
+                   you could resize. Now it's a full-screen surface
+                   on desktop too · authors get the whole viewport
+                   to work the graph. The drawer's own header carries
+                   the close button (Hide), so the tuck handle is
+                   hidden whenever the drawer is open. */
+                .ps-ne-drawer {
+                    top: 0 !important;
+                    left: 0 !important;
+                    right: 0 !important;
+                    width: 100vw !important;
+                    height: 100vh !important;
+                    height: 100dvh !important;
+                    z-index: 70 !important;
+                }
+                .ps-ne-grabber { display: none !important; }
+                /* Var-strip pinned to the bottom edge regardless of
+                   the JS-driven --ps-pb-drawer-h. z-index above the
+                   drawer so it stays visible + draggable while the
+                   drawer is open. */
+                .ps-pb-var-strip {
+                    bottom: 0 !important;
+                    z-index: 80 !important;
+                }
+                /* Tuck handle floats above the var-strip when the
+                   drawer is closed · same offsets desktop + mobile. */
+                .ps-ne-tuck-handle {
+                    bottom: 54px !important;
+                    z-index: 85 !important;
+                }
+
                 @media (max-width: 768px) {
                     .ps-pb-grid {
                         grid-template-columns: 1fr;
@@ -268,49 +301,6 @@
                     .ps-pb-device-toggle { display: none; }
                     /* Email-meta strip also wraps + tightens. */
                     .ps-pb-email-meta { grid-template-columns: 1fr !important; gap: .35rem !important; padding: .5rem .65rem !important; }
-                    /* Drawer goes full-screen on mobile · the whole
-                       viewport becomes the editor. The drawer's own
-                       header carries the close button (the tuck
-                       handle is display:none while open). 100dvh
-                       respects the mobile address-bar shrink/grow. */
-                    .ps-ne-drawer {
-                        top: 0 !important;
-                        left: 0 !important;
-                        right: 0 !important;
-                        width: 100vw !important;
-                        height: 100vh !important;
-                        height: 100dvh !important;
-                        z-index: 70 !important;
-                    }
-                    /* The JS-driven --ps-pb-drawer-h CSS variable
-                       carries the desktop drawer height (352px by
-                       default) and doesn't always reset to 0 when
-                       the drawer closes · so the page-builder grid
-                       was reserving 404px of padding-bottom for a
-                       drawer that's actually full-screen on mobile.
-                       Force it to 0 on phones · the drawer covers
-                       the whole viewport when open anyway, so there
-                       is nothing to reserve. */
-                    :root { --ps-pb-drawer-h: 0px !important; }
-
-                    /* Var-strip pinned to the bottom edge regardless
-                       of the JS-driven --ps-pb-drawer-h. z-index
-                       above the drawer so it stays visible +
-                       draggable while the drawer is open. */
-                    .ps-pb-var-strip {
-                        bottom: 0 !important;
-                        z-index: 80 !important;
-                    }
-                    /* Tuck handle should float ABOVE the var-strip so
-                       the two don't overlap at the bottom of the
-                       screen. The strip is ~42px tall · push the
-                       handle up by that + a small gap. z-index is
-                       higher than the strip so the pill renders on
-                       top in case of any sliver of overlap. */
-                    .ps-ne-tuck-handle {
-                        bottom: 54px !important;
-                        z-index: 85 !important;
-                    }
                     /* Make absolutely sure the canvas inside the
                        drawer reclaims the full width on mobile · the
                        grid drops its palette / settings columns and
@@ -318,7 +308,6 @@
                     .ps-ne-canvas-wrap,
                     .ps-ne-stage-wrap,
                     .ps-ne-canvas { width: 100% !important; }
-                    .ps-ne-grabber { display: none; }
                     /* Phone grid: ONE column · the palette + settings
                        are absolute/fixed sheets on mobile (rules
                        below) so the grid only needs to hand the
