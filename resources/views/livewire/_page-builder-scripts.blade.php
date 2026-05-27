@@ -918,7 +918,7 @@
                         drag: null,
                         rafToken: 0,
                         paletteDragType: null,
-                        ctxMenu: { open: false, x: 0, y: 0, canvasX: 0, canvasY: 0 },
+                        ctxMenu: { open: false, x: 0, y: 0, canvasX: 0, canvasY: 0, expandedGroup: null, hoveredGroup: null },
 
                         // Pan + zoom state · pan in viewport pixels, zoom is a
                         // linear scale. All node positions live in stage-local
@@ -1152,17 +1152,53 @@
                             const s = this.toStage(e.clientX, e.clientY);
                             this.ctxMenu = {
                                 open: true,
-                                // Menu sits over the canvas (viewport-local) so it
-                                // doesn't scale with the stage.
                                 x: Math.round(e.clientX - r.left),
                                 y: Math.round(e.clientY - r.top),
-                                // Drop target stays in stage coords so pan/zoom
-                                // doesn't displace the new node.
                                 canvasX: Math.max(0, Math.round(s.x - 60)),
                                 canvasY: Math.max(0, Math.round(s.y - 12)),
+                                expandedGroup: null,
+                                hoveredGroup: null,
                             };
                         },
-                        closeCtxMenu() { this.ctxMenu.open = false; },
+                        closeCtxMenu() {
+                            this.ctxMenu.open = false;
+                            this.ctxMenu.expandedGroup = null;
+                            this.ctxMenu.hoveredGroup = null;
+                        },
+
+                        // ─── GTA-style weapon-wheel geometry helpers ──
+                        // The wheel is centred at (140, 140) inside a
+                        // 280-square SVG viewBox. Slices share a common
+                        // inner / outer radius and are spaced evenly
+                        // around the circle, top-anchored (start angle
+                        // -π/2) so the first slice points up.
+                        wheelGeometry: { cx: 140, cy: 140, inner: 52, outer: 130 },
+                        wheelSlicePath(i, n) {
+                            const g = this.wheelGeometry;
+                            const a = (2 * Math.PI) / n;
+                            const gap = 0.025;                // small visual gap between slices
+                            const start = i * a - Math.PI / 2 + gap;
+                            const end = start + a - gap * 2;
+                            const r1 = g.inner, r2 = g.outer;
+                            const p = (r, ang) => [g.cx + r * Math.cos(ang), g.cy + r * Math.sin(ang)];
+                            const [x1, y1] = p(r1, start);
+                            const [x2, y2] = p(r2, start);
+                            const [x3, y3] = p(r2, end);
+                            const [x4, y4] = p(r1, end);
+                            const large = (end - start) > Math.PI ? 1 : 0;
+                            return `M ${x1.toFixed(2)} ${y1.toFixed(2)}`
+                                + ` L ${x2.toFixed(2)} ${y2.toFixed(2)}`
+                                + ` A ${r2} ${r2} 0 ${large} 1 ${x3.toFixed(2)} ${y3.toFixed(2)}`
+                                + ` L ${x4.toFixed(2)} ${y4.toFixed(2)}`
+                                + ` A ${r1} ${r1} 0 ${large} 0 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
+                        },
+                        wheelSliceLabel(i, n) {
+                            const g = this.wheelGeometry;
+                            const a = (2 * Math.PI) / n;
+                            const mid = i * a + a / 2 - Math.PI / 2;
+                            const r = (g.inner + g.outer) / 2;
+                            return { x: g.cx + r * Math.cos(mid), y: g.cy + r * Math.sin(mid) };
+                        },
 
                         dropVarHere(name) {
                             const { canvasX, canvasY } = this.ctxMenu;
