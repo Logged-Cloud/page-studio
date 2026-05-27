@@ -1,4 +1,33 @@
             <style>
+                /* ─── Subtle scrollbars · all scrollable surfaces inside
+                   the editor get the same thin, semi-transparent thumb
+                   so the chrome-builder UI doesn't drown in default
+                   chunky OS scrollbars. Firefox uses scrollbar-width /
+                   scrollbar-color; WebKit/Chromium/Safari pick up the
+                   pseudo-element rules. */
+                .ps-page-builder,
+                .ps-page-builder * {
+                    scrollbar-width: thin;
+                    scrollbar-color: rgba(255,255,255,.22) transparent;
+                }
+                .ps-page-builder ::-webkit-scrollbar {
+                    width: 6px;
+                    height: 6px;
+                }
+                .ps-page-builder ::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .ps-page-builder ::-webkit-scrollbar-thumb {
+                    background: rgba(255,255,255,.18);
+                    border-radius: 999px;
+                }
+                .ps-page-builder ::-webkit-scrollbar-thumb:hover {
+                    background: rgba(255,255,255,.32);
+                }
+                .ps-page-builder ::-webkit-scrollbar-corner {
+                    background: transparent;
+                }
+
                 .ps-page-builder {
                     --rail-w: 9rem;
                     --rail-w-expanded: 14rem;
