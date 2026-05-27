@@ -2071,6 +2071,12 @@
                 }
                 .ps-ne-wheel-panel-list {
                     overflow-y: auto;
+                    /* Without overscroll-behavior: contain, scrolling
+                       past the panel's top/bottom edge propagates to
+                       the page (or the canvas) underneath · jarring
+                       on a small surface like this. `contain` keeps
+                       the scroll local. */
+                    overscroll-behavior: contain;
                     padding: .35rem .35rem .55rem;
                     display: flex;
                     flex-direction: column;

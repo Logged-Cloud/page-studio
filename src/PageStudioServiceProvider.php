@@ -116,6 +116,7 @@ class PageStudioServiceProvider extends ServiceProvider
             Nodes\Builtin\SourceIntNode::class,
             Nodes\Builtin\SourceFloatNode::class,
             Nodes\Builtin\SourceVectorNode::class,
+            Nodes\Builtin\SourceRandomNode::class,
             Nodes\Builtin\SourceAuthUserNode::class,
             Nodes\Builtin\SourceAuthIdNode::class,
             Nodes\Builtin\SourceRequestNode::class,
