@@ -375,25 +375,14 @@
                     </section>
                 @endif
 
-                <section class="ps-pb-section">
-                    <h3>Variables</h3>
-                    @if (empty($this->variables))
-                        <p class="ps-pb-hint">No variables on this route yet.</p>
-                    @else
-                        <div class="ps-pb-vars">
-                            @foreach ($this->variables as $v)
-                                <span
-                                    class="ps-pb-var-chip"
-                                    draggable="true"
-                                    @dragstart.stop="onVarDragStart($event, @js($v['name']))"
-                                    @dragend="onVarDragEnd($event)"
-                                    @contextmenu.prevent="insertVarAsNode(@js($v['name']))"
-                                    title="Drag into a text field, drag onto the node canvas, or right-click to insert as a source node"
-                                >&#123;&#123; {{ $v['name'] }} &#125;&#125;</span>
-                            @endforeach
-                        </div>
-                    @endif
-                </section>
+                {{-- Variables · the left-rail panel used to list every
+                     page variable as a draggable chip, but the
+                     persistent .ps-pb-var-strip at the bottom of the
+                     viewport (always visible · scrollable on phone)
+                     covers the same job in a more reachable spot.
+                     The strip's chips share the drag/drop behaviour
+                     and the right-click→insert-as-node path, so this
+                     section was pure duplication · removed. --}}
             </aside>
 
             {{-- ─── CENTRE · canvas ─── --}}
