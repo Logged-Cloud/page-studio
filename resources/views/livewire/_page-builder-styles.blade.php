@@ -213,12 +213,11 @@
                     .ps-pb-device-toggle { display: none; }
                     /* Email-meta strip also wraps + tightens. */
                     .ps-pb-email-meta { grid-template-columns: 1fr !important; gap: .35rem !important; padding: .5rem .65rem !important; }
-                    /* Drawer goes full-screen on mobile · the canvas
-                       is hidden underneath so the author has the
-                       whole viewport to work with. 100dvh respects
-                       the mobile address bar shrink/grow. The
-                       drawer's own header carries the close button
-                       (tuck handle is display:none while open). */
+                    /* Drawer goes full-screen on mobile · the whole
+                       viewport becomes the editor. The drawer's own
+                       header carries the close button (the tuck
+                       handle is display:none while open). 100dvh
+                       respects the mobile address-bar shrink/grow. */
                     .ps-ne-drawer {
                         top: 0 !important;
                         left: 0 !important;
@@ -228,17 +227,25 @@
                         height: 100dvh !important;
                         z-index: 70 !important;
                     }
-                    /* The var-strip's bottom offset is driven by a
-                       JS-set --ps-pb-drawer-h CSS variable. That
-                       variable carries the desktop drawer height
-                       (352px by default) even when the mobile
-                       full-screen rule has overridden the actual
-                       drawer to 100dvh, so the strip floats up to
-                       roughly mid-screen. Just hide the strip while
-                       the drawer is full-screen · the same vars are
-                       reachable from the in-drawer Variables list. */
-                    body:has(.ps-ne-drawer) .ps-pb-var-strip,
-                    body:has(.ps-ne-tuck-handle.is-open) .ps-pb-var-strip { display: none !important; }
+                    /* Var-strip pinned to the bottom edge regardless
+                       of the JS-driven --ps-pb-drawer-h. Without this
+                       override the strip floats up to wherever the
+                       inline style puts it (mid-screen on mobile
+                       because the JS variable still carries the
+                       desktop drawer height). z-index above the
+                       drawer so it stays visible + draggable while
+                       the drawer is open. */
+                    .ps-pb-var-strip {
+                        bottom: 0 !important;
+                        z-index: 80 !important;
+                    }
+                    /* Make absolutely sure the canvas inside the
+                       drawer reclaims the full width on mobile · the
+                       grid drops its palette / settings columns and
+                       the canvas + stage stretch to 100%. */
+                    .ps-ne-canvas-wrap,
+                    .ps-ne-stage-wrap,
+                    .ps-ne-canvas { width: 100% !important; }
                     .ps-ne-grabber { display: none; }
                     .ps-ne-grid    { grid-template-columns: 1fr; grid-template-areas: "canvas"; }
                     /* Node-editor palette + settings on phone · fixed sheets
