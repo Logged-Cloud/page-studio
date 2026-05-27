@@ -267,7 +267,17 @@
         <div class="ps-pb-grid"
              :class="(leftCollapsed ? 'is-left-collapsed ' : '')
                 + ((rightCollapsed || ! $wire.selectedPath) ? 'is-right-collapsed' : '')"
-             :style="`--rail-l: ${leftRailW}px; --rail-r: ${rightRailW}px`">
+             {{-- The grid reserves bottom padding for the drawer + the
+                  var-strip. When the drawer is closed we want ONLY the
+                  ~52px var-strip reserve · branch on $wire.drawerOpen
+                  the same way the var-strip does so a stale
+                  --ps-pb-drawer-h CSS variable can't leave a phantom
+                  ~480px gap that prevents the left rail + canvas from
+                  filling the available height. --}}
+             :style="`--rail-l: ${leftRailW}px; --rail-r: ${rightRailW}px;`
+                    + ($wire.drawerOpen
+                        ? `padding-bottom: calc(var(--ps-pb-drawer-h, 0px) + 3.25rem);`
+                        : `padding-bottom: 3.25rem;`)">
 
             {{-- ─── LEFT · components grouped + variables panel ─── --}}
             <aside class="ps-pb-rail ps-pb-rail--left"
