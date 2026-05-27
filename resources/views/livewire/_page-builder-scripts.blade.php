@@ -1064,8 +1064,13 @@
                                 return;
                             }
 
-                            // Middle-mouse drag (or Alt + left) pans the stage.
-                            if (e.button === 1 || (e.button === 0 && e.altKey)) {
+                            // Middle-mouse drag (or Alt/Shift + left) pans the stage.
+                            // Shift is the "industry standard" pan modifier in
+                            // graph editors (Blender, Figma, n8n) · adding it
+                            // alongside the existing Alt+left + middle-mouse
+                            // means most desktop users get a familiar
+                            // gesture without leaving the home row.
+                            if (e.button === 1 || (e.button === 0 && (e.altKey || e.shiftKey))) {
                                 e.preventDefault();
                                 this.panDrag = {
                                     startX: e.clientX, startY: e.clientY,
