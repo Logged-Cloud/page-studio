@@ -94,6 +94,73 @@ it('image.noise renders an SVG turbulence filter image', function () {
         ->and($decoded)->toContain('seed="7"');
 });
 
+it('image.radial_gradient renders a centred two-stop radial SVG', function () {
+    $node = new \LoggedCloud\PageStudio\Nodes\Builtin\ImageRadialGradientNode();
+    $out  = $node->evaluate([], [
+        'from'   => '#ffffff',
+        'to'     => '#000000',
+        'width'  => 200,
+        'height' => 200,
+    ], []);
+
+    $decoded = rawurldecode($out['image']['url']);
+    expect($decoded)->toContain('radialGradient')
+        ->and($decoded)->toContain('#ffffff')
+        ->and($decoded)->toContain('#000000');
+});
+
+it('image.brick renders an offset-row brick pattern with mortar between rows', function () {
+    $node = new \LoggedCloud\PageStudio\Nodes\Builtin\ImageBrickNode();
+    $out  = $node->evaluate([], [
+        'brick'      => '#8B4513',
+        'mortar'     => '#222222',
+        'brickWidth' => 60,
+        'brickHeight'=> 30,
+        'mortarSize' => 2,
+        'imgWidth'   => 300,
+        'imgHeight'  => 200,
+    ], []);
+
+    $decoded = rawurldecode($out['image']['url']);
+    expect($decoded)->toContain('#8B4513')
+        ->and($decoded)->toContain('#222222')
+        ->and($decoded)->toContain('pattern');
+});
+
+it('image.dots renders a grid of evenly-spaced circles', function () {
+    $node = new \LoggedCloud\PageStudio\Nodes\Builtin\ImageDotsNode();
+    $out  = $node->evaluate([], [
+        'dot'        => '#ffffff',
+        'background' => '#0E1116',
+        'radius'     => 4,
+        'spacing'    => 24,
+        'imgWidth'   => 200,
+        'imgHeight'  => 200,
+    ], []);
+
+    $decoded = rawurldecode($out['image']['url']);
+    expect($decoded)->toContain('#ffffff')
+        ->and($decoded)->toContain('#0E1116')
+        ->and($decoded)->toContain('<circle');
+});
+
+it('image.wave renders SVG sine-wave bands at the requested frequency', function () {
+    $node = new \LoggedCloud\PageStudio\Nodes\Builtin\ImageWaveNode();
+    $out  = $node->evaluate([], [
+        'a'         => '#FF00FF',
+        'b'         => '#000000',
+        'frequency' => 4,
+        'amplitude' => 20,
+        'imgWidth'  => 400,
+        'imgHeight' => 200,
+    ], []);
+
+    $decoded = rawurldecode($out['image']['url']);
+    expect($decoded)->toContain('#FF00FF')
+        ->and($decoded)->toContain('#000000')
+        ->and($decoded)->toMatch('/<path|<rect/');
+});
+
 it('a procedural image still composes through image.hue_rotate · the whole pipeline stays consistent', function () {
     $nodes = [
         ['id' => 'gr',  'type' => 'image.gradient',  'settings' => ['from' => '#ff0000', 'to' => '#00ff00', 'angle' => 0, 'width' => 200, 'height' => 200]],
