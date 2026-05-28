@@ -1481,6 +1481,11 @@
                 .ps-ne-canvas-wrap {
                     position: relative;
                     overflow: hidden;
+                    /* Disable the browser's native touch interpretation
+                       (scroll / pinch-zoom). Without this Chrome on
+                       mobile hijacks finger drags as scroll after ~5px
+                       and cancels our pointer-event-driven pan. */
+                    touch-action: none;
                     background:
                         radial-gradient(circle at 1px 1px, rgba(255,255,255,.06) 1px, transparent 0)
                         var(--surface, #16171a);
