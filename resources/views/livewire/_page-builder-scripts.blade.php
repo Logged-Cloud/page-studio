@@ -1040,9 +1040,21 @@
                             if (e.pointerType === 'touch'
                                 && ! e.target.closest('.ps-ne-node, .ps-ne-socket, .ps-ne-viewport-ctl, .ps-ne-wire')) {
                                 e.preventDefault();
+                                // Claim the gesture on the canvas-wrap
+                                // so subsequent pointermove / up events
+                                // route here even if the finger leaves
+                                // the element bounds or the browser's
+                                // gesture detector wants to reinterpret
+                                // the touch as scroll · without this the
+                                // pan dies after a few pixels on real
+                                // touchscreens.
+                                const captureEl = this.$root;
+                                try { captureEl.setPointerCapture(e.pointerId); } catch (_) {}
+
                                 this.panDrag = {
                                     startX: e.clientX, startY: e.clientY,
                                     originX: this.pan.x, originY: this.pan.y,
+                                    pointerId: e.pointerId,
                                 };
                                 const onMove = (ev) => {
                                     if (ev.pointerType !== 'touch') return;
@@ -1053,14 +1065,19 @@
                                     this.queueRedraw();
                                 };
                                 const onUp = () => {
-                                    window.removeEventListener('pointermove', onMove);
-                                    window.removeEventListener('pointerup',   onUp);
-                                    window.removeEventListener('pointercancel', onUp);
+                                    captureEl.removeEventListener('pointermove', onMove);
+                                    captureEl.removeEventListener('pointerup',   onUp);
+                                    captureEl.removeEventListener('pointercancel', onUp);
+                                    try { captureEl.releasePointerCapture(this.panDrag.pointerId); } catch (_) {}
                                     this.panDrag = null;
                                 };
-                                window.addEventListener('pointermove', onMove);
-                                window.addEventListener('pointerup',   onUp);
-                                window.addEventListener('pointercancel', onUp);
+                                // Listen on the captured element rather
+                                // than window · with pointer capture,
+                                // these events all bubble through the
+                                // captured element.
+                                captureEl.addEventListener('pointermove', onMove);
+                                captureEl.addEventListener('pointerup',   onUp);
+                                captureEl.addEventListener('pointercancel', onUp);
                                 return;
                             }
 
