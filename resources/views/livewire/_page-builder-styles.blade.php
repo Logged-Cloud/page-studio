@@ -343,7 +343,7 @@
                     .ps-pb-find-preview { display: none; }
                 }
                 .ps-pb-rail {
-                    background: rgba(255,255,255,.02);
+                    background: var(--surface-2, #1E1F22);
                     padding: .65rem .55rem;
                     overflow-y: auto;
                     min-width: 0;
@@ -1416,7 +1416,7 @@
                     overflow-y: auto;
                     padding: .55rem .5rem;
                     border-right: 1px solid var(--line, #3A3D40);
-                    background: rgba(255,255,255,.02);
+                    background: var(--surface-2, #1E1F22);
                 }
                 .ps-ne-palette-search {
                     width: 100%;
@@ -2002,7 +2002,7 @@
                 }
                 .ps-ne-wheel-slice.is-hover { transform: scale(1.05); }
                 .ps-ne-wheel-slice-fill {
-                    fill: rgba(255,255,255,.06);
+                    fill: var(--surface-2, #1E1F22);
                     stroke: var(--line, #3A3D40);
                     stroke-width: 1;
                     transition: fill .15s ease, stroke .15s ease;
@@ -2253,7 +2253,7 @@
                     overflow-y: auto;
                     padding: .65rem .65rem;
                     border-left: 1px solid var(--line, #3A3D40);
-                    background: rgba(255,255,255,.02);
+                    background: var(--surface-2, #1E1F22);
                 }
                 .ps-ne-settings h3 {
                     margin: 0 0 .5rem;
