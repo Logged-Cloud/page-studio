@@ -1,5 +1,11 @@
 # Changelog
 
+## v2.12.3 · 2026-07-13
+
+### Fixed
+
+- **Card block text visibility on dark-themed pages** — the card block's title and body inherited the page's ambient text colour rather than a colour pinned to its own light background, so both went invisible whenever a card landed on a dark-themed page. The block now pins a dark text colour on its own container (web + email renders), independent of the host page's theme.
+
 ## v1.0.0 · 2026-05-24
 
 First public release.

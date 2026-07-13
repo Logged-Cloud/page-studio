@@ -48,7 +48,11 @@ class CardBlock extends BlockType
         $body     = PageRenderer::renderChildren($children, 'body', $context, $decorate);
 
         return sprintf(
-            '<div style="background:%s;border-left:4px solid %s;padding:.9rem 1.1rem;border-radius:.4rem;margin:.65em 0">'
+            // The card paints its own light background regardless of the
+            // page's own theme, so its text needs a colour pinned here too
+            // — without it, title/body inherit the ambient page colour and
+            // go invisible the moment a card lands on a dark-themed page.
+            '<div style="background:%s;border-left:4px solid %s;padding:.9rem 1.1rem;border-radius:.4rem;margin:.65em 0;color:#111827">'
                 .'%s%s%s</div>',
             $palette['bg'], $palette['border'],
             $title    !== '' ? '<h3 style="margin:0 0 .25em;font-size:1rem">'.$title.'</h3>' : '',
@@ -76,7 +80,7 @@ class CardBlock extends BlockType
             '<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0" style="margin:10px 0;border-collapse:collapse">'
                 .'<tr>'
                     .'<td width="4" bgcolor="%2$s" style="width:4px;background:%2$s">&nbsp;</td>'
-                    .'<td bgcolor="%1$s" style="background:%1$s;padding:14px 18px">'
+                    .'<td bgcolor="%1$s" style="background:%1$s;padding:14px 18px;color:#111827">'
                         .'%3$s%4$s%5$s'
                     .'</td>'
                 .'</tr>'
